@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="RxRelay — a consent-first voice coordination agent for prescription access." />
+    <title>RxRelay — Proof, not promises</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="aurora aurora-one"></div><div class="aurora aurora-two"></div>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="RxRelay home"><span class="brand-mark">R</span><span>RxRelay</span></a>
+        <div class="mode-pill" id="mode-pill"><span class="pulse"></span> Loading sandbox</div>
+        <a class="docs-link" href="https://github.com/vnmoorthy/rxrelay" target="_blank" rel="noreferrer">Read the protocol ↗</a>
+      </header>
+
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Voice coordination for prescription access</p>
+          <h1>Make the calls.<br /><em>Bring the proof.</em></h1>
+          <p class="hero-copy">RxRelay turns a consented voice request into a verified coordination case—across patient, pharmacy, and clinic—without pretending that “AI completed” means “the problem is solved.”</p>
+        </div>
+        <aside class="safety-card">
+          <span class="shield">✦</span>
+          <div><strong>Safety-bounded by design</strong><p>No medical advice. No prescription changes. No unconsented outreach.</p></div>
+        </aside>
+      </section>
+
+      <section class="case-board" aria-live="polite">
+        <div class="case-heading">
+          <div><p class="eyebrow">Live case-resolution proof board</p><h2 id="case-title">RX-1048 · Demo prescription-access case</h2></div>
+          <div class="status-wrap"><span class="status" id="case-status">Loading</span><span class="subtitle" id="case-created"></span></div>
+        </div>
+
+        <div class="pavo-strip" id="pavo-strip">
+          <div class="pavo-caption"><span class="pavo-logo">PAVO</span><span id="pavo-label">Routing the safest available pipeline</span></div>
+          <div class="pipeline" id="pipeline"></div>
+        </div>
+
+        <div class="board-grid">
+          <section class="lanes" aria-label="Coordination lanes">
+            <article class="lane lane-patient"><div class="lane-head"><span class="lane-icon">01</span><div><p>Patient</p><h3 id="patient-name">—</h3></div></div><div class="lane-body" id="patient-lane"></div></article>
+            <article class="lane lane-pharmacy"><div class="lane-head"><span class="lane-icon">02</span><div><p>Pharmacy</p><h3>Access status</h3></div></div><div class="lane-body" id="pharmacy-lane"></div></article>
+            <article class="lane lane-clinic"><div class="lane-head"><span class="lane-icon">03</span><div><p>Clinic / insurer</p><h3>Required follow-up</h3></div></div><div class="lane-body" id="clinic-lane"></div></article>
+          </section>
+
+          <aside class="proof-panel">
+            <div class="proof-heading"><div><p class="eyebrow">Deterministic close gate</p><h3>Resolution proof</h3></div><span class="proof-score" id="proof-score">0/4</span></div>
+            <p class="proof-intro">A case cannot turn green until every evidence condition is true.</p>
+            <ul class="proof-list" id="proof-list"></ul>
+            <div class="proof-footer" id="proof-footer">No completion claim yet.</div>
+          </aside>
+        </div>
+
+        <div class="actions-panel">
+          <div class="actions-title"><p class="eyebrow">End-to-end sandbox scenario</p><h3>Run the live demo</h3><p>Every button executes a real state transition. This build never calls or texts a real person in sandbox mode.</p></div>
+          <div class="actions" id="actions"></div>
+        </div>
+
+        <div class="bottom-grid">
+          <section class="timeline-panel"><div class="section-title"><p class="eyebrow">Evidence timeline</p><h3>What actually happened</h3></div><ol class="timeline" id="timeline"></ol></section>
+          <section class="message-panel"><div class="section-title"><p class="eyebrow">Patient communication</p><h3>SMS preview</h3></div><div id="message-preview" class="message-preview"><span class="message-placeholder">No patient update has been sent.</span></div><p class="message-note">Messages are consent-gated and tagged with their delivery mode.</p></section>
+        </div>
+      </section>
+
+      <section class="voice-lab">
+        <div><p class="eyebrow">Try the PAVO route</p><h2>What happens when the call gets uncertain?</h2><p>Paste a simulated utterance. RxRelay upgrades the full voice pipeline when critical details are unclear, and stops safely for requests it must not automate.</p></div>
+        <form id="voice-form" class="voice-form">
+          <label for="utterance">Simulated inbound voice turn</label>
+          <textarea id="utterance" rows="3">The pharmacy said I need prior authorization, but I couldn't hear the reference number.</textarea>
+          <div class="form-row"><label>ASR confidence <input id="asr-confidence" type="range" min="0.5" max="1" step="0.01" value="0.71" /></label><output id="asr-output">71%</output><button type="submit">Route this turn</button></div>
+        </form>
+        <div class="voice-result" id="voice-result"><span class="result-kicker">PAVO will show its routing decision here.</span></div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "rxrelay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consent-first voice coordination for prescription access.",
+  "scripts": {
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
+    "test": "node --test",
+    "check": "node --check server.mjs && node --check src/pavo.mjs && node --check src/inference.mjs && node --check src/store.mjs && node --check src/telephony.mjs && node --check public/app.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
