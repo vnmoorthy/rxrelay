@@ -9,7 +9,9 @@ import {
   consentFromTranscript,
   detectConversationalIntent,
   scriptedConversationalReply,
-  optionsForStatus,
+  goalForStatus,
+  extractCallerNotes,
+  recentTranscriptDigest,
 } from "./dialogue.mjs";
 
 const now = () => new Date().toISOString();
@@ -135,6 +137,8 @@ export class CaseStore {
         counterpartLinks: [],
         insurer: null,
         receiptTip: null,
+        conversationTurns: [],
+        callerNotes: {},
       };
       this.cases.set(caseId, record);
       this.addEvent(record, "case_created", "Case created with minimum necessary details.", "system", { source, pavoTier: routed.tier });
@@ -284,6 +288,8 @@ export class CaseStore {
         counterpartLinks: [],
         insurer: null,
         receiptTip: null,
+        conversationTurns: [],
+        callerNotes: {},
       };
       this.cases.set(caseId, record);
       this.addEvent(record, "case_created", "Case created with minimum necessary details.", "system", { source: "voice", pavoTier: routed.tier });
@@ -298,6 +304,9 @@ export class CaseStore {
     return this.mutateAsync(async () => {
       const record = this.cases.get(caseId);
       if (!record) throw new Error(`Case ${caseId} was not found.`);
+      if (!record.conversationTurns) record.conversationTurns = [];
+      if (!record.callerNotes) record.callerNotes = {};
+
       const previouslyConsented = record.evidence.consentRecorded;
       const consentParse = consentFromTranscript(transcript);
       let consentRecorded = false;
@@ -310,18 +319,22 @@ export class CaseStore {
         this.addEvent(record, "consent_recorded", "Explicit consent recorded for permitted status coordination and updates.", "patient", { source: "voice", statement: String(transcript) });
       }
 
+      Object.assign(record.callerNotes, extractCallerNotes(transcript));
+      if (record.callerNotes.medicationHint && record.medication === "Prescription access request") {
+        record.medication = record.callerNotes.medicationHint;
+      }
+
       const statusBefore = deriveStatus(record).key;
       let action = null;
       const intent = detectConversationalIntent(transcript, statusBefore);
-      // Only act on coordination intents after consent already existed before this turn,
-      // so the consent utterance itself cannot also fire a pharmacy call.
       if (previouslyConsented && !record.humanReview) {
         try {
           if (intent === "start_coordination" && !record.coordinationStarted) {
             await this.beginCoordinationUnlocked(caseId);
             action = "start_coordination";
           } else if (intent === "pharmacy_blocker" && record.coordinationStarted && !record.pharmacy.blocker) {
-            this.recordPharmacyBlockerUnlocked(caseId);
+            const blocker = /insurance/i.test(transcript) ? "Insurance / prior authorization hold" : "Prior authorization needed";
+            this.recordPharmacyBlockerUnlocked(caseId, { blocker });
             action = "pharmacy_blocker";
           } else if (intent === "clinic_submission" && record.pharmacy.blocker && !record.clinic.submissionRecorded) {
             this.recordClinicSubmissionUnlocked(caseId);
@@ -343,31 +356,50 @@ export class CaseStore {
         action = "escalate";
       }
 
+      // Soft auto-start: consented caller tells a stuck-prescription story without explicit "check status"
+      if (previouslyConsented && !action && !record.humanReview && !record.coordinationStarted && intent === "vent") {
+        // stay conversational — do not auto-start without a clear ask
+      }
+
+      const actionLabel = consentRecorded ? "consent" : action;
+      const digest = recentTranscriptDigest(record.conversationTurns);
       const result = await this.inboundTurnUnlocked({
         caseId,
         transcript,
         asrConfidence,
         noiseLevel,
         intentConfidence,
-        dialogueHint: optionsForStatus(deriveStatus(record).key, { consented: record.evidence.consentRecorded }),
+        dialogueHint: goalForStatus(deriveStatus(record).key, { consented: record.evidence.consentRecorded }),
+        conversationDigest: digest,
+        actionTaken: actionLabel,
+        intent,
+        callerNotes: record.callerNotes,
       });
 
       const statusKey = deriveStatus(record).key;
-      let reply = scriptedConversationalReply({
+      const fallback = scriptedConversationalReply({
         statusKey,
         consented: record.evidence.consentRecorded,
-        action: consentRecorded ? "consent" : action,
+        action: actionLabel,
         intent,
         caseId,
         humanReview: record.humanReview,
+        notes: record.callerNotes,
       });
-      // Prefer natural model phrasing for open chat when no state transition fired.
-      if (!consentRecorded && !action && intent === "chat" && result.route.tier !== "safe_stop") {
-        reply = `${result.reply} ${optionsForStatus(statusKey, { consented: record.evidence.consentRecorded })}`.trim();
-      } else if (result.route.tier === "safe_stop") {
+
+      let reply = fallback;
+      if (result.route.tier === "safe_stop") {
+        reply = result.reply;
+      } else if (result.inference?.source === "openai-compatible" && result.reply) {
+        // Prefer Maya's natural model voice for almost all turns, including after actions.
         reply = result.reply;
       }
-      return { ...result, reply, consentRecorded, action: consentRecorded ? "consent" : action, intent };
+
+      record.conversationTurns.push({ role: "user", text: String(transcript), at: now(), intent, action: actionLabel });
+      record.conversationTurns.push({ role: "assistant", text: reply, at: now() });
+      if (record.conversationTurns.length > 40) record.conversationTurns = record.conversationTurns.slice(-40);
+
+      return { ...result, reply, consentRecorded, action: actionLabel, intent };
     });
   }
 
@@ -488,7 +520,18 @@ export class CaseStore {
     return this.mutateAsync(async () => this.inboundTurnUnlocked({ caseId, transcript, asrConfidence, noiseLevel, intentConfidence }));
   }
 
-  async inboundTurnUnlocked({ caseId = "RX-1048", transcript, asrConfidence, noiseLevel, intentConfidence, dialogueHint = "" }) {
+  async inboundTurnUnlocked({
+    caseId = "RX-1048",
+    transcript,
+    asrConfidence,
+    noiseLevel,
+    intentConfidence,
+    dialogueHint = "",
+    conversationDigest = "",
+    actionTaken = null,
+    intent = "chat",
+    callerNotes = {},
+  }) {
     const record = this.cases.get(caseId);
     if (!record) throw new Error(`Case ${caseId} was not found.`);
     const route = routeTurn({ transcript, asrConfidence, noiseLevel, intentConfidence, historyDepth: record.events.length });
@@ -500,7 +543,11 @@ export class CaseStore {
       consentRecorded: record.evidence.consentRecorded,
       statusKey,
       dialogueHint,
-      caseBrief: `Case ${caseId}; consent=${record.evidence.consentRecorded}; status=${statusKey}; medication=${record.medication}; coordinationStarted=${record.coordinationStarted}; pharmacyBlocker=${record.pharmacy.blocker || "none"}; clinicSubmitted=${record.clinic.submissionRecorded}; ready=${record.pharmacy.readyForPickup}; proof=${JSON.stringify(record.evidence)}.`,
+      conversationDigest,
+      actionTaken,
+      intent,
+      callerNotes,
+      caseBrief: `Case ${caseId}; consent=${record.evidence.consentRecorded}; status=${statusKey}; medication=${record.medication}; coordinationStarted=${record.coordinationStarted}; pharmacyBlocker=${record.pharmacy.blocker || "none"}; clinicSubmitted=${record.clinic.submissionRecorded}; ready=${record.pharmacy.readyForPickup}; proof=${JSON.stringify(record.evidence)}; notes=${JSON.stringify(record.callerNotes || {})}.`,
     });
     this.addEvent(record, "voice_turn", inference.text, "patient", {
       transcript,

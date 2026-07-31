@@ -276,3 +276,34 @@ test("verified capture mode is exposed on the verified tier label", async () => 
   });
   assert.equal(route.tier, "verified");
 });
+
+import {
+  detectConversationalIntent,
+  consentFromTranscript,
+  extractCallerNotes,
+} from "../src/dialogue.mjs";
+
+test("dialogue understands venting, off-topic, and story-shaped outcomes", () => {
+  assert.equal(detectConversationalIntent("I've called ten times and I'm so frustrated nobody is helping"), "vent");
+  assert.equal(detectConversationalIntent("what's the weather today"), "off_topic");
+  assert.equal(
+    detectConversationalIntent("So yeah after all that the pharmacy said they need prior authorization before they can fill it", "coordinating"),
+    "pharmacy_blocker",
+  );
+  assert.equal(
+    detectConversationalIntent("still waiting, nothing yet from them", "waiting_pharmacy"),
+    "still_waiting",
+  );
+});
+
+test("natural consent phrases still require a scoped yes", () => {
+  assert.equal(consentFromTranscript("sure, you can check my pharmacy status").granted, true);
+  assert.equal(consentFromTranscript("please help with my prescription").granted, false);
+  assert.equal(consentFromTranscript("please help with my prescription").softAsk, true);
+});
+
+test("caller notes capture pharmacy mentions", () => {
+  const notes = extractCallerNotes("I've been stuck with CVS pharmacy for 5 days");
+  assert.ok(notes.pharmacyName);
+  assert.equal(notes.waitDays, 5);
+});

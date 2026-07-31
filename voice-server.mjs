@@ -74,7 +74,7 @@ function gather(prompt, action, { verified = false } = {}) {
     ? ' hints="authorization number, prior auth, pharmacy status, clinic submitted, ready for pickup"'
     : ' hints="consent, pharmacy status, prior authorization, clinic, ready for pickup, human"';
   const numDigits = verified ? ' numDigits="8"' : "";
-  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="9" speechTimeout="auto" language="en-US" profanityFilter="false"${numDigits}${hints}>${say(prompt)}</Gather>${say(noInputPrompt())}`;
+  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="10" speechTimeout="auto" language="en-US" profanityFilter="false"${numDigits}${hints}>${say(prompt)}</Gather>${say(noInputPrompt())}`;
 }
 
 const server = http.createServer(async (req, res) => {

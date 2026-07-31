@@ -1,19 +1,24 @@
 import { scriptedVoiceReply, TIER_LABELS } from "./pavo.mjs";
+import { goalForStatus } from "./dialogue.mjs";
 
-const SYSTEM_PROMPT = `You are RxRelay, a warm, careful phone coordinator for prescription-access status.
-Speak like a thoughtful human on a support line — natural, clear, and never rushed.
+const SYSTEM_PROMPT = `You are Maya, a real phone coordinator at RxRelay.
+You sound like a thoughtful, emotionally intelligent human on a care-access line — warm, concise, never corporate-robotic.
 
-You help with: pharmacy status checks, prior-authorization follow-ups, clinic submission updates, and pickup readiness.
-You do NOT: give medical advice, dosing, diagnosis, coverage determinations, prescribe, change/transfer prescriptions, or disclose controlled-medication inventory.
-You never claim a case is resolved unless consent, permitted action, counterpart outcome, and patient update are already on the record.
+Your job: help callers with prescription ACCESS status (pharmacy delays, prior authorization follow-ups, clinic submissions, pickup readiness) and complete an evidence trail.
+You are NOT a clinician. Never give dosing, diagnosis, medical advice, coverage determinations, prescribing, Rx changes/transfers, or controlled-inventory answers. For those, hand off to a human.
 
-Conversation style:
-- Acknowledge what the caller said in plain language.
-- Ask one focused follow-up question when needed.
-- Offer 2–3 concrete next things they can say (options), so the call feels guided, not robotic.
-- Keep replies speakable: about 2–5 short sentences. No markdown, bullets, or JSON.
-- If speech sounds uncertain (names, dates, authorization numbers), confirm before acting.
-- If the request is clinical/urgent/unsafe, stop and hand off to a human.`;
+How to talk:
+- Speak in first person as Maya. Use natural contractions (I'm, that's, we'll).
+- Acknowledge feelings and context first when the caller vents, tells a long story, or mixes topics.
+- Handle complex turns: extract the access-relevant facts, ignore noise, ask one clarifying question if needed.
+- You may briefly answer what you are / how this works, then steer back to their case.
+- Never dump a numbered menu unless they ask for options.
+- Keep replies speakable for phone TTS: 2–5 short sentences. No markdown, bullets, emoji, or JSON.
+- Never invent pharmacy/clinic outcomes. Only treat facts the caller (or system action) just established.
+- Never claim the case is resolved unless the proof gate is already complete.
+- Always leave a gentle next step that advances the real task when appropriate.
+
+PAVO note (internal): when speech is uncertain on names/dates/auth numbers, confirm before acting — a stronger model cannot repair a misheard number.`;
 
 function responseText(payload) {
   if (typeof payload.output_text === "string" && payload.output_text.trim()) return payload.output_text.trim();
@@ -37,22 +42,31 @@ export class PavoInferenceEngine {
   }
 
   modelFor(route) {
-    if (route.tier === "verified" || route.jointUpgrade && route.signals?.nearCouplingCliff) {
+    // Prefer the strong model for natural conversation quality on coordination turns.
+    if (route.tier === "verified" || route.tier === "balanced" || route.jointUpgrade) {
       return process.env.PAVO_STRONG_MODEL || process.env.PAVO_FAST_MODEL;
     }
-    if (route.tier === "balanced") {
-      return process.env.PAVO_STRONG_MODEL || process.env.PAVO_FAST_MODEL;
-    }
-    return process.env.PAVO_FAST_MODEL;
+    return process.env.PAVO_STRONG_MODEL || process.env.PAVO_FAST_MODEL;
   }
 
   maxTokensFor(route) {
-    if (route.tier === "verified") return 280;
-    if (route.tier === "balanced") return 240;
-    return 180;
+    if (route.tier === "verified") return 320;
+    if (route.tier === "balanced") return 280;
+    return 220;
   }
 
-  async respond({ transcript, route, caseBrief, consentRecorded = false, statusKey = "intake", dialogueHint = "" }) {
+  async respond({
+    transcript,
+    route,
+    caseBrief,
+    consentRecorded = false,
+    statusKey = "intake",
+    dialogueHint = "",
+    conversationDigest = "",
+    actionTaken = null,
+    intent = "chat",
+    callerNotes = {},
+  }) {
     const fallback = scriptedVoiceReply(route, { consentRecorded, statusKey });
     if (!this.configuredFor(route)) {
       return { text: fallback, source: "local-safe-fallback", model: null, pipeline: TIER_LABELS[route.tier] };
@@ -60,17 +74,20 @@ export class PavoInferenceEngine {
     const endpoint = `${process.env.PAVO_OPENAI_BASE_URL.replace(/\/$/, "")}/responses`;
     const labels = TIER_LABELS[route.tier] || TIER_LABELS.fast;
     const demand = route.signals?.demand ?? null;
+    const goal = dialogueHint || goalForStatus(statusKey, { consented: consentRecorded });
     const input = [
       SYSTEM_PROMPT,
       "",
-      `Caller said: ${transcript}`,
       `Case context: ${caseBrief}`,
-      `Suggested next options for the caller: ${dialogueHint || "ask what they need next"}`,
-      `PAVO route: ${route.tier} (paper=${route.paperRoute || labels.paperRoute})`,
-      `Joint pipeline: ASR=${route.asrTier || labels.asrTier} · reasoning=${route.reasoningTier || labels.reasoningTier}`,
-      `Demand score: ${demand}; couplingCliff=${Boolean(route.signals?.nearCouplingCliff)}; jointUpgrade=${Boolean(route.jointUpgrade)}`,
+      `Detected intent: ${intent}`,
+      actionTaken ? `System action just completed: ${actionTaken}. Acknowledge it naturally; do not redo it.` : "No system state transition this turn — converse and gently advance the goal.",
+      `Caller notes so far: ${JSON.stringify(callerNotes || {})}`,
+      `Current task goal: ${goal}`,
+      conversationDigest ? `Recent conversation:\n${conversationDigest}` : "Recent conversation: (start of call)",
+      `Caller just said: ${transcript}`,
+      `PAVO route: ${route.tier}; demand=${demand}; jointUpgrade=${Boolean(route.jointUpgrade)}`,
       `Guardrail: ${route.guardrail}`,
-      "Reply for spoken playback only. End with a clear question or next-step options when the case is still open.",
+      "Reply as Maya for spoken playback only.",
     ].join("\n");
     try {
       const response = await this.fetch(endpoint, {
