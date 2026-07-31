@@ -79,9 +79,7 @@ const server = http.createServer(async (req, res) => {
     const result = await store.handleVoiceTurn({ caseId, transcript, asrConfidence: Number(payload.Confidence || payload.confidence || .9), noiseLevel: Number(payload.noiseLevel || .1) });
     const say = result.case.humanReview
       ? "A human coordinator will review this safely. I will not take further automated action."
-      : result.consentRecorded
-        ? "Your explicit consent is recorded and your RxRelay case is open. I will keep the case open until there is verified evidence."
-        : result.reply;
+      : result.reply;
     return sendXml(res, gather(say, nextUrl(req, "/voice/turn", { caseId })));
   } catch (error) {
     return sendXml(res, `<Say>RxRelay had a temporary issue. Please try again shortly.</Say>`);

@@ -16,7 +16,7 @@ A case can close only when **consent ∧ action ∧ counterpart outcome ∧ pati
 [![Runtime deps](https://img.shields.io/badge/runtime_deps-0-08786b?style=for-the-badge)](package.json)
 
 [![CI](https://github.com/vnmoorthy/rxrelay/actions/workflows/ci.yml/badge.svg)](https://github.com/vnmoorthy/rxrelay/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-10_passing-10a895)](test/rxrelay.test.mjs)
+[![Tests](https://img.shields.io/badge/tests-11_passing-10a895)](test/rxrelay.test.mjs)
 [![PAVO](https://img.shields.io/badge/routing-PAVO--inspired-08786b)](https://github.com/vnmoorthy/pavo-bench)
 [![Live telephony](https://img.shields.io/badge/live_telephony-fails_closed-b45309)](docs/A1MOBILE_LIVE_SETUP.md)
 [![Stars](https://img.shields.io/github/stars/vnmoorthy/rxrelay?style=social)](https://github.com/vnmoorthy/rxrelay/stargazers)
@@ -169,6 +169,9 @@ Two processes. One shared case file. The public tunnel only ever touches the TeX
 ```
 
 Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · **full diagram:** [`docs/ARCHITECTURE_DIAGRAM.md`](docs/ARCHITECTURE_DIAGRAM.md) · pitch slide 08 in [`assets/architecture.png`](assets/architecture.png).
+
+<img src="assets/architecture.png" alt="RxRelay detailed architecture diagram" width="100%" />
+
 
 ---
 

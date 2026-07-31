@@ -50,7 +50,7 @@ function render(caseRecord) {
   $("#case-created").textContent = `Opened ${time(caseRecord.createdAt)}`;
   const status = $("#case-status"); status.textContent = caseRecord.status.label; status.className = `status ${caseRecord.status.tone}`;
   $("#patient-name").textContent = caseRecord.patient.alias;
-  $("#pavo-label").textContent = `${caseRecord.pipeline.label} · ${caseRecord.lastRoute.reason}`;
+  $("#pavo-label").textContent = `${caseRecord.pipeline.label} · ${caseRecord.lastRoute.reason}${caseRecord.lastRoute.signals?.demand != null ? ` · demand ${caseRecord.lastRoute.signals.demand}` : ""}`;
   $("#pipeline").innerHTML = pipeline(caseRecord);
   $("#patient-lane").innerHTML = laneEvent(caseRecord, "patient", "Waiting for a consented request.");
   $("#pharmacy-lane").innerHTML = laneEvent(caseRecord, "pharmacy", "No pharmacy outcome recorded.");

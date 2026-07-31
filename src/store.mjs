@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { routeTurn, TIER_LABELS } from "./pavo.mjs";
+import { routeTurn, TIER_LABELS, detectVoiceIntent } from "./pavo.mjs";
 import { PavoInferenceEngine } from "./inference.mjs";
 import { JsonCasePersistence } from "./persist.mjs";
 
@@ -193,15 +193,59 @@ export class CaseStore {
     return this.mutateAsync(async () => {
       const record = this.cases.get(caseId);
       if (!record) throw new Error(`Case ${caseId} was not found.`);
+      const previouslyConsented = record.evidence.consentRecorded;
       const saysConsent = /\b(i\s+consent|i\s+give\s+(?:you\s+)?permission|yes[,\s]+you\s+(?:may|can)|you\s+have\s+my\s+permission)\b/i.test(String(transcript || ""));
       const scopedConsent = /\b(pharmacy|status|coordinate|text|update)\b/i.test(String(transcript || ""));
-      const consentRecorded = !record.evidence.consentRecorded && saysConsent && scopedConsent;
+      const consentRecorded = !previouslyConsented && saysConsent && scopedConsent;
       if (consentRecorded) {
         record.evidence.consentRecorded = true;
         this.addEvent(record, "consent_recorded", "Explicit consent recorded for permitted status coordination and updates.", "patient", { source: "voice", statement: String(transcript) });
       }
+
+      let action = null;
+      const intent = detectVoiceIntent(transcript);
+      // Only act on coordination intents after consent already existed before this turn,
+      // so the consent utterance itself cannot also fire a pharmacy call.
+      if (previouslyConsented && !record.humanReview) {
+        try {
+          if (intent === "start_coordination" && !record.coordinationStarted) {
+            await this.beginCoordinationUnlocked(caseId);
+            action = "start_coordination";
+          } else if (intent === "pharmacy_blocker" && record.coordinationStarted && !record.pharmacy.blocker) {
+            this.recordPharmacyBlockerUnlocked(caseId);
+            action = "pharmacy_blocker";
+          } else if (intent === "clinic_submission" && record.pharmacy.blocker && !record.clinic.submissionRecorded) {
+            this.recordClinicSubmissionUnlocked(caseId);
+            action = "clinic_submission";
+          } else if (intent === "pharmacy_ready" && record.clinic.submissionRecorded && !record.pharmacy.readyForPickup) {
+            await this.recordPharmacyReadyUnlocked(caseId);
+            action = "pharmacy_ready";
+          } else if (intent === "escalate") {
+            record.humanReview = true;
+            this.addEvent(record, "human_handoff", "Caller requested a human coordinator.", "system");
+            action = "escalate";
+          }
+        } catch (error) {
+          this.addEvent(record, "voice_action_blocked", error.message, "system", { intent });
+        }
+      }
+
       const result = await this.inboundTurnUnlocked({ caseId, transcript, asrConfidence, noiseLevel, intentConfidence });
-      return { ...result, consentRecorded };
+      let reply = result.reply;
+      if (consentRecorded) {
+        reply = "Your explicit consent is recorded and your RxRelay case is open. Say check my prescription status to start a permitted pharmacy follow-up.";
+      } else if (action === "start_coordination") {
+        reply = "I started a permitted pharmacy status follow-up. Your case stays open until a counterpart outcome and patient update are recorded.";
+      } else if (action === "pharmacy_blocker") {
+        reply = "I recorded the pharmacy blocker: prior authorization is needed. I can next record when the clinic submits the follow-up.";
+      } else if (action === "clinic_submission") {
+        reply = "Clinic follow-up is recorded. Tell me when the pharmacy confirms the prescription is ready for pickup.";
+      } else if (action === "pharmacy_ready") {
+        reply = "Pharmacy readiness is recorded and a consented status update was sent. Your resolution proof is complete.";
+      } else if (action === "escalate") {
+        reply = "A human coordinator will take it from here. I will not take further automated action.";
+      }
+      return { ...result, reply, consentRecorded, action, intent };
     });
   }
 
@@ -226,58 +270,66 @@ export class CaseStore {
   }
 
   async beginCoordination(id) {
-    return this.mutateAsync(async () => {
-      const record = this.cases.get(id);
-      if (!record) throw new Error(`Case ${id} was not found.`);
-      this.requireConsent(record);
-      const call = await this.telephony.placeCoordinationCall({
-        caseId: id,
-        counterpart: "sandbox pharmacy desk",
-        summary: "Confirm non-clinical prescription access status only. Do not request or disclose clinical information.",
-      });
-      record.coordinationStarted = true;
-      record.evidence.permittedActionCompleted = true;
-      this.addEvent(record, "pharmacy_call_started", call.message, "pharmacy", { callId: call.id, mode: call.mode });
-      return this.getUnlocked(id);
+    return this.mutateAsync(async () => this.beginCoordinationUnlocked(id));
+  }
+
+  async beginCoordinationUnlocked(id) {
+    const record = this.cases.get(id);
+    if (!record) throw new Error(`Case ${id} was not found.`);
+    this.requireConsent(record);
+    const call = await this.telephony.placeCoordinationCall({
+      caseId: id,
+      counterpart: "sandbox pharmacy desk",
+      summary: "Confirm non-clinical prescription access status only. Do not request or disclose clinical information.",
     });
+    record.coordinationStarted = true;
+    record.evidence.permittedActionCompleted = true;
+    this.addEvent(record, "pharmacy_call_started", call.message, "pharmacy", { callId: call.id, mode: call.mode });
+    return this.getUnlocked(id);
   }
 
   recordPharmacyBlocker(id, { blocker = "Prior authorization needed" } = {}) {
-    return this.mutate(() => {
-      const record = this.cases.get(id);
-      if (!record) throw new Error(`Case ${id} was not found.`);
-      this.requireConsent(record);
-      record.pharmacy.blocker = blocker;
-      record.pharmacy.readyForPickup = false;
-      record.evidence.counterpartOutcomeRecorded = true;
-      this.addEvent(record, "pharmacy_blocker", `Pharmacy outcome recorded: ${blocker}.`, "pharmacy");
-      return this.getUnlocked(id);
-    });
+    return this.mutate(() => this.recordPharmacyBlockerUnlocked(id, { blocker }));
+  }
+
+  recordPharmacyBlockerUnlocked(id, { blocker = "Prior authorization needed" } = {}) {
+    const record = this.cases.get(id);
+    if (!record) throw new Error(`Case ${id} was not found.`);
+    this.requireConsent(record);
+    record.pharmacy.blocker = blocker;
+    record.pharmacy.readyForPickup = false;
+    record.evidence.counterpartOutcomeRecorded = true;
+    this.addEvent(record, "pharmacy_blocker", `Pharmacy outcome recorded: ${blocker}.`, "pharmacy");
+    return this.getUnlocked(id);
   }
 
   recordClinicSubmission(id, { reference = "PA-2048" } = {}) {
-    return this.mutate(() => {
-      const record = this.cases.get(id);
-      if (!record) throw new Error(`Case ${id} was not found.`);
-      this.requireConsent(record);
-      if (!record.pharmacy.blocker) throw new Error("Record a pharmacy blocker before recording a clinic submission.");
-      record.clinic.submissionRecorded = true;
-      this.addEvent(record, "clinic_submission", `Clinic outcome recorded: prior authorization submitted (${reference}).`, "clinic", { reference });
-      return this.getUnlocked(id);
-    });
+    return this.mutate(() => this.recordClinicSubmissionUnlocked(id, { reference }));
+  }
+
+  recordClinicSubmissionUnlocked(id, { reference = "PA-2048" } = {}) {
+    const record = this.cases.get(id);
+    if (!record) throw new Error(`Case ${id} was not found.`);
+    this.requireConsent(record);
+    if (!record.pharmacy.blocker) throw new Error("Record a pharmacy blocker before recording a clinic submission.");
+    record.clinic.submissionRecorded = true;
+    this.addEvent(record, "clinic_submission", `Clinic outcome recorded: prior authorization submitted (${reference}).`, "clinic", { reference });
+    return this.getUnlocked(id);
   }
 
   async recordPharmacyReady(id) {
-    return this.mutateAsync(async () => {
-      const record = this.cases.get(id);
-      if (!record) throw new Error(`Case ${id} was not found.`);
-      this.requireConsent(record);
-      if (!record.clinic.submissionRecorded) throw new Error("Record the clinic follow-up before confirming pharmacy readiness.");
-      record.pharmacy.readyForPickup = true;
-      record.evidence.counterpartOutcomeRecorded = true;
-      this.addEvent(record, "pharmacy_ready", "Pharmacy confirmed the prescription is ready for pickup.", "pharmacy");
-      return this.sendPatientUpdateUnlocked(id, "Your pharmacy confirmed your prescription is ready for pickup. Please contact the pharmacy directly for pickup details.", "resolution_update");
-    });
+    return this.mutateAsync(async () => this.recordPharmacyReadyUnlocked(id));
+  }
+
+  async recordPharmacyReadyUnlocked(id) {
+    const record = this.cases.get(id);
+    if (!record) throw new Error(`Case ${id} was not found.`);
+    this.requireConsent(record);
+    if (!record.clinic.submissionRecorded) throw new Error("Record the clinic follow-up before confirming pharmacy readiness.");
+    record.pharmacy.readyForPickup = true;
+    record.evidence.counterpartOutcomeRecorded = true;
+    this.addEvent(record, "pharmacy_ready", "Pharmacy confirmed the prescription is ready for pickup.", "pharmacy");
+    return this.sendPatientUpdateUnlocked(id, "Your pharmacy confirmed your prescription is ready for pickup. Please contact the pharmacy directly for pickup details.", "resolution_update");
   }
 
   async sendPatientUpdate(id, text, reason = "status_update") {
@@ -319,14 +371,21 @@ export class CaseStore {
     if (!record) throw new Error(`Case ${caseId} was not found.`);
     const route = routeTurn({ transcript, asrConfidence, noiseLevel, intentConfidence, historyDepth: record.events.length });
     record.lastRoute = route;
+    const statusKey = deriveStatus(record).key;
     const inference = await this.inference.respond({
       transcript,
       route,
-      caseBrief: `Case ${caseId}; consent=${record.evidence.consentRecorded}; status=${deriveStatus(record).key}; medication=${record.medication}.`,
+      consentRecorded: record.evidence.consentRecorded,
+      statusKey,
+      caseBrief: `Case ${caseId}; consent=${record.evidence.consentRecorded}; status=${statusKey}; medication=${record.medication}; coordinationStarted=${record.coordinationStarted}; proof=${JSON.stringify(record.evidence)}.`,
     });
-    this.addEvent(record, "voice_turn", inference.text, "patient", { transcript, route, inference: { source: inference.source, model: inference.model } });
+    this.addEvent(record, "voice_turn", inference.text, "patient", {
+      transcript,
+      route,
+      inference: { source: inference.source, model: inference.model, pipeline: inference.pipeline?.pipeline || null },
+    });
     if (route.tier === "safe_stop") record.humanReview = true;
-    return { case: this.getUnlocked(caseId), route, reply: inference.text, inference: { source: inference.source, model: inference.model } };
+    return { case: this.getUnlocked(caseId), route, reply: inference.text, inference: { source: inference.source, model: inference.model, pipeline: inference.pipeline } };
   }
 
   async receiveWebhook(event) {

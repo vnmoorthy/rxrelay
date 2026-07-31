@@ -1,7 +1,11 @@
-import { scriptedVoiceReply } from "./pavo.mjs";
+import { scriptedVoiceReply, TIER_LABELS } from "./pavo.mjs";
 
 const SYSTEM_PROMPT = `You are RxRelay, a consent-first voice coordinator for prescription access.
-You may coordinate non-clinical status follow-ups only after explicit consent. You do not provide medical advice, dosing, diagnosis, coverage determinations, prescribing, prescription changes/transfers, or controlled-medication inventory. You do not claim a case is resolved without recorded counterpart evidence and a patient update. Keep the spoken reply warm, short, and specific. If the user requests a prohibited action or reports urgent symptoms, direct them to urgent help or their care team and say a human coordinator will review the case.`;
+You are powered by PAVO-style pipeline-aware routing: when speech is uncertain, transcription and reasoning upgrade together because a stronger language model cannot repair a misheard authorization number (PAVO coupling cliff, OpenReview zrneoIxlFx).
+
+You may coordinate non-clinical status follow-ups only after explicit consent. You do not provide medical advice, dosing, diagnosis, coverage determinations, prescribing, prescription changes/transfers, or controlled-medication inventory. You do not claim a case is resolved without recorded counterpart evidence and a patient update.
+
+Keep the spoken reply warm, short (1-3 sentences), and specific. If the user requests a prohibited action or reports urgent symptoms, direct them to urgent help or their care team and say a human coordinator will review the case. When the route is verified, ask one clarifying confirmation for any critical name, date, or authorization reference before acting.`;
 
 function responseText(payload) {
   if (typeof payload.output_text === "string" && payload.output_text.trim()) return payload.output_text.trim();
@@ -20,23 +24,47 @@ export class PavoInferenceEngine {
 
   configuredFor(route) {
     if (route.tier === "safe_stop") return false;
-    const model = route.tier === "verified" ? process.env.PAVO_STRONG_MODEL : process.env.PAVO_FAST_MODEL;
+    const model = this.modelFor(route);
     return Boolean(process.env.PAVO_OPENAI_BASE_URL && process.env.PAVO_OPENAI_API_KEY && model);
   }
 
   modelFor(route) {
-    return route.tier === "verified" ? process.env.PAVO_STRONG_MODEL : process.env.PAVO_FAST_MODEL;
+    // Joint upgrade: verified/coupling-risk turns always use the strong model.
+    if (route.tier === "verified" || route.jointUpgrade && route.signals?.nearCouplingCliff) {
+      return process.env.PAVO_STRONG_MODEL || process.env.PAVO_FAST_MODEL;
+    }
+    if (route.tier === "balanced") {
+      return process.env.PAVO_STRONG_MODEL || process.env.PAVO_FAST_MODEL;
+    }
+    return process.env.PAVO_FAST_MODEL;
   }
 
-  async respond({ transcript, route, caseBrief }) {
-    const fallback = scriptedVoiceReply(route);
-    if (!this.configuredFor(route)) return { text: fallback, source: "local-safe-fallback", model: null };
+  maxTokensFor(route) {
+    if (route.tier === "verified") return 220;
+    if (route.tier === "balanced") return 180;
+    return 120;
+  }
+
+  async respond({ transcript, route, caseBrief, consentRecorded = false, statusKey = "intake" }) {
+    const fallback = scriptedVoiceReply(route, { consentRecorded, statusKey });
+    if (!this.configuredFor(route)) {
+      return { text: fallback, source: "local-safe-fallback", model: null, pipeline: TIER_LABELS[route.tier] };
+    }
     const endpoint = `${process.env.PAVO_OPENAI_BASE_URL.replace(/\/$/, "")}/responses`;
-    // a1mobile's hackathon gateway implements the Responses endpoint but does
-    // not support the optional `instructions` field. Keep the safety contract
-    // in the single portable input string so it works with both the gateway and
-    // standard OpenAI-compatible deployments.
-    const input = `${SYSTEM_PROMPT}\n\nCaller said: ${transcript}\n\nCase context: ${caseBrief}\nRoute: ${route.tier}. Guardrail: ${route.guardrail}`;
+    const labels = TIER_LABELS[route.tier] || TIER_LABELS.fast;
+    const demand = route.signals?.demand ?? null;
+    const input = [
+      SYSTEM_PROMPT,
+      "",
+      `Caller said: ${transcript}`,
+      `Case context: ${caseBrief}`,
+      `PAVO route: ${route.tier} (paper=${route.paperRoute || labels.paperRoute})`,
+      `Joint pipeline: ASR=${route.asrTier || labels.asrTier} · reasoning=${route.reasoningTier || labels.reasoningTier}`,
+      `Demand score: ${demand}; couplingCliff=${Boolean(route.signals?.nearCouplingCliff)}; jointUpgrade=${Boolean(route.jointUpgrade)}`,
+      `Guardrail: ${route.guardrail}`,
+      `Citation: ${route.citation || "PAVO OpenReview zrneoIxlFx"}`,
+      "Reply for spoken playback only. Do not mention JSON or internal ids.",
+    ].join("\n");
     try {
       const response = await this.fetch(endpoint, {
         method: "POST",
@@ -44,13 +72,28 @@ export class PavoInferenceEngine {
           authorization: `Bearer ${process.env.PAVO_OPENAI_API_KEY}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ model: this.modelFor(route), input, max_output_tokens: 160 }),
+        body: JSON.stringify({
+          model: this.modelFor(route),
+          input,
+          max_output_tokens: this.maxTokensFor(route),
+        }),
       });
       if (!response.ok) throw new Error(`Responses API returned ${response.status}`);
       const text = responseText(await response.json());
-      return { text: text || fallback, source: text ? "openai-compatible" : "local-safe-fallback", model: this.modelFor(route) };
+      return {
+        text: text || fallback,
+        source: text ? "openai-compatible" : "local-safe-fallback",
+        model: this.modelFor(route),
+        pipeline: labels,
+      };
     } catch (error) {
-      return { text: fallback, source: "local-safe-fallback", model: this.modelFor(route), warning: error.message };
+      return {
+        text: fallback,
+        source: "local-safe-fallback",
+        model: this.modelFor(route),
+        pipeline: labels,
+        warning: error.message,
+      };
     }
   }
 }

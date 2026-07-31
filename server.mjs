@@ -201,9 +201,7 @@ const server = http.createServer(async (req, res) => {
       });
       const followUp = result.case.humanReview
         ? "A human coordinator will review this safely. I will not take further automated action."
-        : result.consentRecorded
-          ? "Your explicit consent is recorded and your RxRelay case is open. I will keep the case open until there is verified evidence."
-          : result.reply;
+        : result.reply;
       return texml(res, gather(followUp, voiceUrl("/voice/turn", { caseId })));
     }
 

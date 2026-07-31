@@ -9,10 +9,61 @@ import { CaseStore } from "../src/store.mjs";
 import { JsonCasePersistence } from "../src/persist.mjs";
 import { A1MobileAdapter, DemoTelephonyAdapter } from "../src/telephony.mjs";
 
-test("PAVO routing upgrades the full pipeline for uncertain critical audio", () => {
-  const route = routeTurn({ transcript: "The pharmacy said the prior authorization number is unclear", asrConfidence: 0.62, noiseLevel: 0.6 });
+test("PAVO demand score jointly upgrades ASR and reasoning near the coupling cliff", () => {
+  const route = routeTurn({
+    transcript: "The prior authorization number sounded like PA two zero four eight",
+    asrConfidence: 0.71,
+    noiseLevel: 0.55,
+    intentConfidence: 0.8,
+  });
   assert.equal(route.tier, "verified");
-  assert.match(route.guardrail, /Confirm critical names/);
+  assert.equal(route.jointUpgrade, true);
+  assert.equal(route.asrTier, "cloud_premium");
+  assert.equal(route.reasoningTier, "strong_verified");
+  assert.ok(route.signals.demand > 0.5);
+  assert.match(route.citation, /coupling cliff/i);
+});
+
+test("voice turns can complete the sandbox proof path after consent", async () => {
+  const store = new CaseStore({ telephony: new DemoTelephonyAdapter() });
+  const voiceCase = store.openVoiceCase({ callId: "call-e2e-voice", from: "+15550000099" });
+  await store.handleVoiceTurn({
+    caseId: voiceCase.id,
+    transcript: "I consent to a pharmacy status follow-up and text updates.",
+    asrConfidence: .97,
+    noiseLevel: .04,
+  });
+  const started = await store.handleVoiceTurn({
+    caseId: voiceCase.id,
+    transcript: "Please check the status of my prescription follow-up.",
+    asrConfidence: .95,
+    noiseLevel: .05,
+  });
+  assert.equal(started.action, "start_coordination");
+  assert.equal(started.case.evidence.permittedActionCompleted, true);
+  const blocker = await store.handleVoiceTurn({
+    caseId: voiceCase.id,
+    transcript: "The pharmacy said prior authorization is needed.",
+    asrConfidence: .94,
+    noiseLevel: .06,
+  });
+  assert.equal(blocker.action, "pharmacy_blocker");
+  const clinic = await store.handleVoiceTurn({
+    caseId: voiceCase.id,
+    transcript: "The clinic submitted the prior authorization.",
+    asrConfidence: .95,
+    noiseLevel: .05,
+  });
+  assert.equal(clinic.action, "clinic_submission");
+  const ready = await store.handleVoiceTurn({
+    caseId: voiceCase.id,
+    transcript: "The pharmacy says it is ready for pickup.",
+    asrConfidence: .96,
+    noiseLevel: .04,
+  });
+  assert.equal(ready.action, "pharmacy_ready");
+  assert.equal(ready.case.proof.ready, true);
+  assert.equal(ready.case.status.key, "resolved");
 });
 
 test("PAVO stops unsafe medical advice instead of automating it", () => {
