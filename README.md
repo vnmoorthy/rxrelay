@@ -41,7 +41,7 @@ A case can close only when **consent ∧ action ∧ counterpart outcome ∧ pati
 | Human ops queue + resume + timeout scan | **Works** |
 | Live SSE proof stream | **Works** (`/api/events`) |
 | MCP tools (8) | **Works** |
-| Marketing site + 12-slide HTML/PPTX deck | **Shipped** |
+| Marketing site + 13-slide HTML/PPTX deck | **Shipped** |
 | Live outbound SMS | **Fail-closed until OTP allowlist + `ALLOW_LIVE_TELEPHONY`** |
 | Live outbound coordination call | **Fail-closed until call-action URL is configured** |
 | Real pharmacy/clinic EHR integrations | **Out of scope** — counterpart portal is the attestation seam |
@@ -200,7 +200,7 @@ git clone https://github.com/vnmoorthy/rxrelay.git
 cd rxrelay
 cp .env.example .env
 npm test        # 17 tests · node:test · no install step
-npm run deck    # rebuild portable 12-slide PPTX + open deck/pitch.html
+npm run deck    # rebuild portable 13-slide PPTX + open deck/pitch.html
 npm run dev     # http://localhost:3000
 ```
 
@@ -356,7 +356,7 @@ public/               Proof-board dashboard
 site/                 Marketing site → GitHub Pages
 assets/               Social preview + pitch visuals for the README
 docs/                 Architecture, live setup, demo script
-deck/                 10-slide hackathon pitch deck
+deck/                 13-slide hackathon pitch deck
 test/                 node:test suite (routing, consent, proof honesty)
 ```
 
