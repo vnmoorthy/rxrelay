@@ -13,11 +13,11 @@
 <meta property="og:title" content="RxRelay — a voice agent that has to prove it helped" />
 <meta property="og:description" content="Consent-first voice coordination for prescription access, gated on deterministic proof: consent ∧ action ∧ outcome ∧ patient update." />
 <meta property="og:url" content="https://vnmoorthy.github.io/rxrelay/" />
-<meta property="og:image" content="https://vnmoorthy.github.io/rxrelay/assets/proof-board.png" />
+<meta property="og:image" content="https://vnmoorthy.github.io/rxrelay/assets/social-preview.png" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="RxRelay — a voice agent that has to prove it helped" />
 <meta name="twitter:description" content="Consent-first voice coordination for prescription access, gated on deterministic proof." />
-<meta name="twitter:image" content="https://vnmoorthy.github.io/rxrelay/assets/proof-board.png" />
+<meta name="twitter:image" content="https://vnmoorthy.github.io/rxrelay/assets/social-preview.png" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -252,6 +252,11 @@
       </div>
     </div>
 
+    <figure class="shot">
+      <img src="assets/architecture.png" alt="RxRelay architecture slide: voice ingress, PAVO routing, case engine, and proof gate" width="1600" height="900" loading="lazy" />
+      <figcaption>System topology from the pitch deck — public edge, isolated voice process, shared case core.</figcaption>
+    </figure>
+
     <div class="repo-map">
       <p class="section-kicker">Where the logic lives</p>
       <dl>
@@ -306,6 +311,11 @@
       Safe stop is evaluated <strong>first</strong>, before any confidence math, and it flags the case
       for human review so no downstream action can proceed.
     </p>
+
+    <figure class="shot">
+      <img src="assets/pavo-routing.png" alt="PAVO routing slide showing Fast, Balanced, Verified, and Safe stop pipelines" width="1600" height="900" loading="lazy" />
+      <figcaption>Demand-conditioned routing — upgrade transcription and reasoning together.</figcaption>
+    </figure>
 
     <div class="links-row">
       <a class="link-card" href="https://openreview.net/forum?id=zrneoIxlFx">
