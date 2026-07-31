@@ -1,10 +1,16 @@
 import crypto from "node:crypto";
-import { routeTurn, TIER_LABELS, detectVoiceIntent } from "./pavo.mjs";
+import { routeTurn, TIER_LABELS } from "./pavo.mjs";
 import { PavoInferenceEngine } from "./inference.mjs";
 import { JsonCasePersistence } from "./persist.mjs";
 import { publishCaseEvent } from "./bus.mjs";
 import { buildProofReceipt } from "./receipt.mjs";
 import { issueCounterpartToken, consumeCounterpartToken, listOpenTokensForCase } from "./counterpart.mjs";
+import {
+  consentFromTranscript,
+  detectConversationalIntent,
+  scriptedConversationalReply,
+  optionsForStatus,
+} from "./dialogue.mjs";
 
 const now = () => new Date().toISOString();
 const clone = (value) => structuredClone(value);
@@ -293,16 +299,20 @@ export class CaseStore {
       const record = this.cases.get(caseId);
       if (!record) throw new Error(`Case ${caseId} was not found.`);
       const previouslyConsented = record.evidence.consentRecorded;
-      const saysConsent = /\b(i\s+consent|i\s+give\s+(?:you\s+)?permission|yes[,\s]+you\s+(?:may|can)|you\s+have\s+my\s+permission)\b/i.test(String(transcript || ""));
-      const scopedConsent = /\b(pharmacy|status|coordinate|text|update)\b/i.test(String(transcript || ""));
-      const consentRecorded = !previouslyConsented && saysConsent && scopedConsent;
-      if (consentRecorded) {
+      const consentParse = consentFromTranscript(transcript);
+      let consentRecorded = false;
+      if (!previouslyConsented && consentParse.granted === false && consentParse.scoped) {
+        record.humanReview = true;
+        this.addEvent(record, "consent_declined", "Caller declined consent; case held for human review.", "patient", { statement: String(transcript) });
+      } else if (!previouslyConsented && consentParse.granted) {
         record.evidence.consentRecorded = true;
+        consentRecorded = true;
         this.addEvent(record, "consent_recorded", "Explicit consent recorded for permitted status coordination and updates.", "patient", { source: "voice", statement: String(transcript) });
       }
 
+      const statusBefore = deriveStatus(record).key;
       let action = null;
-      const intent = detectVoiceIntent(transcript);
+      const intent = detectConversationalIntent(transcript, statusBefore);
       // Only act on coordination intents after consent already existed before this turn,
       // so the consent utterance itself cannot also fire a pharmacy call.
       if (previouslyConsented && !record.humanReview) {
@@ -327,24 +337,37 @@ export class CaseStore {
         } catch (error) {
           this.addEvent(record, "voice_action_blocked", error.message, "system", { intent });
         }
+      } else if (!previouslyConsented && intent === "escalate") {
+        record.humanReview = true;
+        this.addEvent(record, "human_handoff", "Caller requested a human coordinator before consent.", "system");
+        action = "escalate";
       }
 
-      const result = await this.inboundTurnUnlocked({ caseId, transcript, asrConfidence, noiseLevel, intentConfidence });
-      let reply = result.reply;
-      if (consentRecorded) {
-        reply = "Your explicit consent is recorded and your RxRelay case is open. Say check my prescription status to start a permitted pharmacy follow-up.";
-      } else if (action === "start_coordination") {
-        reply = "I started a permitted pharmacy status follow-up. Your case stays open until a counterpart outcome and patient update are recorded.";
-      } else if (action === "pharmacy_blocker") {
-        reply = "I recorded the pharmacy blocker: prior authorization is needed. I can next record when the clinic submits the follow-up.";
-      } else if (action === "clinic_submission") {
-        reply = "Clinic follow-up is recorded. Tell me when the pharmacy confirms the prescription is ready for pickup.";
-      } else if (action === "pharmacy_ready") {
-        reply = "Pharmacy readiness is recorded and a consented status update was sent. Your resolution proof is complete.";
-      } else if (action === "escalate") {
-        reply = "A human coordinator will take it from here. I will not take further automated action.";
+      const result = await this.inboundTurnUnlocked({
+        caseId,
+        transcript,
+        asrConfidence,
+        noiseLevel,
+        intentConfidence,
+        dialogueHint: optionsForStatus(deriveStatus(record).key, { consented: record.evidence.consentRecorded }),
+      });
+
+      const statusKey = deriveStatus(record).key;
+      let reply = scriptedConversationalReply({
+        statusKey,
+        consented: record.evidence.consentRecorded,
+        action: consentRecorded ? "consent" : action,
+        intent,
+        caseId,
+        humanReview: record.humanReview,
+      });
+      // Prefer natural model phrasing for open chat when no state transition fired.
+      if (!consentRecorded && !action && intent === "chat" && result.route.tier !== "safe_stop") {
+        reply = `${result.reply} ${optionsForStatus(statusKey, { consented: record.evidence.consentRecorded })}`.trim();
+      } else if (result.route.tier === "safe_stop") {
+        reply = result.reply;
       }
-      return { ...result, reply, consentRecorded, action, intent };
+      return { ...result, reply, consentRecorded, action: consentRecorded ? "consent" : action, intent };
     });
   }
 
@@ -465,7 +488,7 @@ export class CaseStore {
     return this.mutateAsync(async () => this.inboundTurnUnlocked({ caseId, transcript, asrConfidence, noiseLevel, intentConfidence }));
   }
 
-  async inboundTurnUnlocked({ caseId = "RX-1048", transcript, asrConfidence, noiseLevel, intentConfidence }) {
+  async inboundTurnUnlocked({ caseId = "RX-1048", transcript, asrConfidence, noiseLevel, intentConfidence, dialogueHint = "" }) {
     const record = this.cases.get(caseId);
     if (!record) throw new Error(`Case ${caseId} was not found.`);
     const route = routeTurn({ transcript, asrConfidence, noiseLevel, intentConfidence, historyDepth: record.events.length });
@@ -476,7 +499,8 @@ export class CaseStore {
       route,
       consentRecorded: record.evidence.consentRecorded,
       statusKey,
-      caseBrief: `Case ${caseId}; consent=${record.evidence.consentRecorded}; status=${statusKey}; medication=${record.medication}; coordinationStarted=${record.coordinationStarted}; proof=${JSON.stringify(record.evidence)}.`,
+      dialogueHint,
+      caseBrief: `Case ${caseId}; consent=${record.evidence.consentRecorded}; status=${statusKey}; medication=${record.medication}; coordinationStarted=${record.coordinationStarted}; pharmacyBlocker=${record.pharmacy.blocker || "none"}; clinicSubmitted=${record.clinic.submissionRecorded}; ready=${record.pharmacy.readyForPickup}; proof=${JSON.stringify(record.evidence)}.`,
     });
     this.addEvent(record, "voice_turn", inference.text, "patient", {
       transcript,

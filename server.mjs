@@ -8,7 +8,7 @@ import { JsonCasePersistence } from "./src/persist.mjs";
 import { createTelephonyAdapter, liveTelephonyMissing, normalizeA1MobileEvent } from "./src/telephony.mjs";
 import { caseBus } from "./src/bus.mjs";
 import { verifyProofReceipt } from "./src/receipt.mjs";
-import { peekCounterpartToken } from "./src/counterpart.mjs";
+import { openPrompt, noInputPrompt, sayVoiceAttrs } from "./src/dialogue.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "public");
@@ -73,9 +73,13 @@ function voiceTokenValid(requestUrl) {
   return !process.env.VOICE_WEBHOOK_TOKEN || requestUrl.searchParams.get("token") === process.env.VOICE_WEBHOOK_TOKEN;
 }
 
-function gather(say, actionUrl, verified = false) {
+function say(text) {
+  return `<Say${sayVoiceAttrs()}>${xmlEscape(text)}</Say>`;
+}
+
+function gather(prompt, actionUrl, verified = false) {
   const input = verified ? "speech dtmf" : "speech";
-  return `<Gather input="${input}" action="${xmlEscape(actionUrl)}" method="POST" timeout="7" speechTimeout="auto" language="en-US"${verified ? ' numDigits="8"' : ""}><Say>${xmlEscape(say)}</Say></Gather><Say>I did not hear a response. Please call back when you are ready.</Say>`;
+  return `<Gather input="${input}" action="${xmlEscape(actionUrl)}" method="POST" timeout="9" speechTimeout="auto" language="en-US"${verified ? ' numDigits="8"' : ""}>${say(prompt)}</Gather>${say(noInputPrompt())}`;
 }
 
 function config() {
@@ -289,14 +293,14 @@ const server = http.createServer(async (req, res) => {
       const payload = req.method === "POST" ? await body(req) : Object.fromEntries(requestUrl.searchParams);
       const caseRecord = store.openVoiceCase({ callId: payload.CallSid || payload.call_id, from: payload.From || payload.from });
       const action = voiceUrl("/voice/turn", { caseId: caseRecord.id });
-      return texml(res, gather("Hi, you reached RxRelay. I can coordinate a prescription access status follow-up. I do not provide medical advice or change prescriptions. To continue, say: I consent to a pharmacy status follow-up and text updates.", action));
+      return texml(res, gather(openPrompt(), action));
     }
 
     if (pathname === "/voice/turn" && ["GET", "POST"].includes(req.method)) {
       if (!voiceTokenValid(requestUrl)) return json(res, 401, { error: "Invalid voice webhook token." });
       const payload = req.method === "POST" ? await body(req) : Object.fromEntries(requestUrl.searchParams);
       const caseId = requestUrl.searchParams.get("caseId") || payload.caseId;
-      if (!caseId) return texml(res, "<Say>Your voice session is missing a case reference. Please call again.</Say>");
+      if (!caseId) return texml(res, say("Your voice session is missing a case reference. Please call again."));
       const digits = String(payload.Digits || "").trim();
       const speech = String(payload.SpeechResult || payload.speech_result || payload.transcript || "").trim();
       const transcript = digits ? `${speech ? `${speech} ` : ""}authorization digits ${digits.split("").join(" ")}`.trim() : speech;
@@ -307,9 +311,7 @@ const server = http.createServer(async (req, res) => {
         noiseLevel: Number(payload.noiseLevel || (digits ? 0.02 : 0.1)),
       });
       const verified = result.route?.tier === "verified";
-      const followUp = result.case.humanReview
-        ? "A human coordinator will review this safely. I will not take further automated action."
-        : result.reply;
+      const followUp = result.reply;
       return texml(res, gather(followUp, voiceUrl("/voice/turn", { caseId }), verified));
     }
 

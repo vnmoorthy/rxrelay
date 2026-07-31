@@ -1,11 +1,19 @@
 import { scriptedVoiceReply, TIER_LABELS } from "./pavo.mjs";
 
-const SYSTEM_PROMPT = `You are RxRelay, a consent-first voice coordinator for prescription access.
-You are powered by PAVO-style pipeline-aware routing: when speech is uncertain, transcription and reasoning upgrade together because a stronger language model cannot repair a misheard authorization number (PAVO coupling cliff, OpenReview zrneoIxlFx).
+const SYSTEM_PROMPT = `You are RxRelay, a warm, careful phone coordinator for prescription-access status.
+Speak like a thoughtful human on a support line — natural, clear, and never rushed.
 
-You may coordinate non-clinical status follow-ups only after explicit consent. You do not provide medical advice, dosing, diagnosis, coverage determinations, prescribing, prescription changes/transfers, or controlled-medication inventory. You do not claim a case is resolved without recorded counterpart evidence and a patient update.
+You help with: pharmacy status checks, prior-authorization follow-ups, clinic submission updates, and pickup readiness.
+You do NOT: give medical advice, dosing, diagnosis, coverage determinations, prescribe, change/transfer prescriptions, or disclose controlled-medication inventory.
+You never claim a case is resolved unless consent, permitted action, counterpart outcome, and patient update are already on the record.
 
-Keep the spoken reply warm, short (1-3 sentences), and specific. If the user requests a prohibited action or reports urgent symptoms, direct them to urgent help or their care team and say a human coordinator will review the case. When the route is verified, ask one clarifying confirmation for any critical name, date, or authorization reference before acting.`;
+Conversation style:
+- Acknowledge what the caller said in plain language.
+- Ask one focused follow-up question when needed.
+- Offer 2–3 concrete next things they can say (options), so the call feels guided, not robotic.
+- Keep replies speakable: about 2–5 short sentences. No markdown, bullets, or JSON.
+- If speech sounds uncertain (names, dates, authorization numbers), confirm before acting.
+- If the request is clinical/urgent/unsafe, stop and hand off to a human.`;
 
 function responseText(payload) {
   if (typeof payload.output_text === "string" && payload.output_text.trim()) return payload.output_text.trim();
@@ -29,7 +37,6 @@ export class PavoInferenceEngine {
   }
 
   modelFor(route) {
-    // Joint upgrade: verified/coupling-risk turns always use the strong model.
     if (route.tier === "verified" || route.jointUpgrade && route.signals?.nearCouplingCliff) {
       return process.env.PAVO_STRONG_MODEL || process.env.PAVO_FAST_MODEL;
     }
@@ -40,12 +47,12 @@ export class PavoInferenceEngine {
   }
 
   maxTokensFor(route) {
-    if (route.tier === "verified") return 220;
-    if (route.tier === "balanced") return 180;
-    return 120;
+    if (route.tier === "verified") return 280;
+    if (route.tier === "balanced") return 240;
+    return 180;
   }
 
-  async respond({ transcript, route, caseBrief, consentRecorded = false, statusKey = "intake" }) {
+  async respond({ transcript, route, caseBrief, consentRecorded = false, statusKey = "intake", dialogueHint = "" }) {
     const fallback = scriptedVoiceReply(route, { consentRecorded, statusKey });
     if (!this.configuredFor(route)) {
       return { text: fallback, source: "local-safe-fallback", model: null, pipeline: TIER_LABELS[route.tier] };
@@ -58,12 +65,12 @@ export class PavoInferenceEngine {
       "",
       `Caller said: ${transcript}`,
       `Case context: ${caseBrief}`,
+      `Suggested next options for the caller: ${dialogueHint || "ask what they need next"}`,
       `PAVO route: ${route.tier} (paper=${route.paperRoute || labels.paperRoute})`,
       `Joint pipeline: ASR=${route.asrTier || labels.asrTier} · reasoning=${route.reasoningTier || labels.reasoningTier}`,
       `Demand score: ${demand}; couplingCliff=${Boolean(route.signals?.nearCouplingCliff)}; jointUpgrade=${Boolean(route.jointUpgrade)}`,
       `Guardrail: ${route.guardrail}`,
-      `Citation: ${route.citation || "PAVO OpenReview zrneoIxlFx"}`,
-      "Reply for spoken playback only. Do not mention JSON or internal ids.",
+      "Reply for spoken playback only. End with a clear question or next-step options when the case is still open.",
     ].join("\n");
     try {
       const response = await this.fetch(endpoint, {

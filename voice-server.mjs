@@ -3,6 +3,7 @@ import { CaseStore } from "./src/store.mjs";
 import { JsonCasePersistence } from "./src/persist.mjs";
 import { createTelephonyAdapter } from "./src/telephony.mjs";
 import { TIER_LABELS } from "./src/pavo.mjs";
+import { openPrompt, noInputPrompt, sayVoiceAttrs } from "./src/dialogue.mjs";
 
 const store = new CaseStore({
   telephony: createTelephonyAdapter(),
@@ -59,17 +60,21 @@ function authorized(url) {
   return Boolean(process.env.VOICE_WEBHOOK_TOKEN) && url.searchParams.get("token") === process.env.VOICE_WEBHOOK_TOKEN;
 }
 
+function say(text) {
+  return `<Say${sayVoiceAttrs()}>${xmlEscape(text)}</Say>`;
+}
+
 /**
  * PAVO capture upgrade: verified turns open speech + DTMF so critical
  * authorization digits can be confirmed without relying on a better LLM alone.
  */
-function gather(say, action, { verified = false } = {}) {
+function gather(prompt, action, { verified = false } = {}) {
   const input = verified ? "speech dtmf" : "speech";
   const hints = verified
-    ? ' hints="expect digits for any authorization or reference number"'
-    : "";
+    ? ' hints="authorization number, prior auth, pharmacy status, clinic submitted, ready for pickup"'
+    : ' hints="consent, pharmacy status, prior authorization, clinic, ready for pickup, human"';
   const numDigits = verified ? ' numDigits="8"' : "";
-  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="7" speechTimeout="auto" language="en-US"${numDigits}${hints}><Say>${xmlEscape(say)}</Say></Gather><Say>I did not hear a response. Please call back when you are ready.</Say>`;
+  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="9" speechTimeout="auto" language="en-US" profanityFilter="false"${numDigits}${hints}>${say(prompt)}</Gather>${say(noInputPrompt())}`;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -81,6 +86,7 @@ const server = http.createServer(async (req, res) => {
         service: "rxrelay-voice",
         model: process.env.PAVO_FAST_MODEL || null,
         captureUpgrade: TIER_LABELS.verified.captureMode,
+        voice: process.env.TEXML_VOICE || "Polly.Joanna-Neural",
       });
     }
     if (!["GET", "POST"].includes(req.method) || !["/voice", "/voice/turn"].includes(url.pathname)) {
@@ -90,18 +96,18 @@ const server = http.createServer(async (req, res) => {
     const payload = req.method === "POST" ? await parseRequest(req) : Object.fromEntries(url.searchParams);
     if (url.pathname === "/voice") {
       const caseRecord = store.openVoiceCase({ callId: payload.CallSid || payload.call_id, from: payload.From || payload.from });
-      return sendXml(res, gather(
-        "Hi, you reached RxRelay. I can coordinate a prescription access status follow-up. I do not provide medical advice or change prescriptions. To continue, say: I consent to a pharmacy status follow-up and text updates.",
-        nextUrl(req, "/voice/turn", { caseId: caseRecord.id }),
-      ));
+      return sendXml(res, gather(openPrompt(), nextUrl(req, "/voice/turn", { caseId: caseRecord.id })));
     }
     const caseId = url.searchParams.get("caseId") || payload.caseId;
-    if (!caseId) return sendXml(res, "<Say>Your voice session is missing a case reference. Please call again.</Say>");
+    if (!caseId) return sendXml(res, say("Your voice session is missing a case reference. Please call again."));
     const digits = String(payload.Digits || payload.digits || "").trim();
     const speech = String(payload.SpeechResult || payload.speech_result || payload.transcript || "").trim();
     const transcript = digits
       ? `${speech ? `${speech} ` : ""}authorization digits ${digits.split("").join(" ")}`.trim()
       : speech;
+    if (!transcript) {
+      return sendXml(res, gather(noInputPrompt(), nextUrl(req, "/voice/turn", { caseId })));
+    }
     const result = await store.handleVoiceTurn({
       caseId,
       transcript,
@@ -109,14 +115,15 @@ const server = http.createServer(async (req, res) => {
       noiseLevel: Number(payload.noiseLevel || (digits ? 0.02 : 0.1)),
     });
     const verified = result.route?.tier === "verified" || result.route?.jointUpgrade;
-    const say = result.case.humanReview
-      ? "A human coordinator will review this safely. I will not take further automated action."
-      : verified && !digits
-        ? `${result.reply} If you have an authorization or reference number, you can also enter the digits on your keypad now.`
-        : result.reply;
-    return sendXml(res, gather(say, nextUrl(req, "/voice/turn", { caseId }), { verified }));
+    let spoken = result.case.humanReview
+      ? result.reply
+      : result.reply;
+    if (verified && !digits && !result.case.humanReview) {
+      spoken = `${spoken} If you have an authorization or reference number, you can also enter the digits on your keypad.`;
+    }
+    return sendXml(res, gather(spoken, nextUrl(req, "/voice/turn", { caseId }), { verified }));
   } catch {
-    return sendXml(res, "<Say>RxRelay had a temporary issue. Please try again shortly.</Say>");
+    return sendXml(res, say("RxRelay had a temporary issue. Please try again shortly, or ask for a human coordinator."));
   }
 });
 
