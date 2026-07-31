@@ -677,3 +677,65 @@ h2 {
     display: none;
   }
 }
+
+/* Market funnel (slide 11) */
+.market-funnel {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+.market-band {
+  display: grid;
+  grid-template-columns: 110px 140px 1fr;
+  gap: 12px 18px;
+  align-items: start;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+.market-tam { width: 100%; }
+.market-sam { width: 92%; margin-inline: auto; background: rgba(57, 214, 192, 0.08); border-color: rgba(57, 214, 192, 0.22); }
+.market-som { width: 78%; margin-inline: auto; background: rgba(57, 214, 192, 0.14); border-color: rgba(57, 214, 192, 0.35); }
+.market-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--teal-bright);
+  padding-top: 4px;
+}
+.market-fig {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1.15;
+}
+.market-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  grid-column: 3;
+}
+.market-note {
+  grid-column: 2 / -1;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.62);
+}
+.market-sources {
+  margin: 16px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.48);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (max-width: 900px) {
+  .market-band {
+    grid-template-columns: 1fr;
+    width: 100% !important;
+  }
+  .market-label, .market-note { grid-column: 1; }
+}

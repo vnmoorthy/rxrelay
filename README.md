@@ -10,7 +10,7 @@ Consent-first voice coordination for prescription access.
 A case can close only when **consent ∧ action ∧ counterpart outcome ∧ patient update** are on the record — not when an LLM says “done.”
 
 [![Website](https://img.shields.io/badge/🌐_Website-vnmoorthy.github.io%2Frxrelay-0f766e?style=for-the-badge)](https://vnmoorthy.github.io/rxrelay/)
-[![Pitch Deck](https://img.shields.io/badge/📊_Pitch_Deck-12_slides-071829?style=for-the-badge)](deck/output/RxRelay_Hackathon_Pitch.pptx)
+[![Pitch Deck](https://img.shields.io/badge/📊_Pitch_Deck-13_slides-071829?style=for-the-badge)](deck/output/RxRelay_Hackathon_Pitch.pptx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-10a895?style=for-the-badge)](LICENSE)
 [![Node ≥20](https://img.shields.io/badge/Node-%E2%89%A520-43853d?style=for-the-badge&logo=node.js&logoColor=white)](package.json)
 [![Runtime deps](https://img.shields.io/badge/runtime_deps-0-08786b?style=for-the-badge)](package.json)

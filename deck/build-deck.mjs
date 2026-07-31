@@ -156,8 +156,26 @@ const SLIDES = [
     dark: true,
   },
   {
-    kicker: "Why invest / Catalyst fit",
+    kicker: "Company opportunity",
     num: 11,
+    title: "A real company wedge: medication-access coordination.",
+    body: [
+      "TAM: AI voice agents in healthcare ~$0.5–2.1B (2025; definition-dependent).",
+      "Pain pool / SAM signal: ~$93B navigating utilization management (Health Affairs); CAQH ~$89B admin transactions.",
+      "SOM beachhead: specialty pharmacies, patient hubs, digital pharmacies — priced per resolved case, not per chat.",
+    ],
+    bullets: [
+      "Charge for resolved access cases — not words spoken",
+      "Wedge: evidence-gated coordination where PA / status loops already burn staff",
+      "Sources: Towards Healthcare · Healthcare Foresights · Health Affairs · CAQH Index 2023 (directional)",
+    ],
+    footer: "Own the proof-gated access workflow.",
+    notes: "Company slide: do not claim we capture $93B. TAM is voice AI in healthcare; $93B is the pain pool that justifies budget. Beachhead is specialty access desks that already buy telephony.",
+    dark: true,
+  },
+  {
+    kicker: "Why invest / Catalyst fit",
+    num: 12,
     title: "Evidence culture. Load-bearing network. Open research.",
     bullets: [
       "Evidence culture — proof gates, signed receipts, Groundtruth / MCP Observatory discipline",
@@ -170,16 +188,16 @@ const SLIDES = [
   },
   {
     kicker: "Ask",
-    num: 12,
+    num: 13,
     title: "A prescription should not fail because coordination did.",
     body: ["RxRelay turns a consented call into a verifiable outcome."],
     bullets: [
       "github.com/vnmoorthy/rxrelay",
       "openreview.net/forum?id=zrneoIxlFx · PAVO paper",
-      "Next: live OTP SMS + production tunnel",
+      "Next: live OTP SMS + production tunnel · beachhead = specialty access",
     ],
     footer: "RxRelay · Proof, not promises.",
-    notes: "End on conviction. Invite judges to live board and safety stop. Next: OTP SMS + production tunnel.",
+    notes: "End on conviction. Invite judges to live board and safety stop. Next: OTP SMS + production tunnel + specialty access pilots.",
     dark: true,
   },
 ];
