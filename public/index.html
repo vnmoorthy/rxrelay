@@ -30,7 +30,12 @@
 
       <section class="case-board" aria-live="polite">
         <div class="case-heading">
-          <div><p class="eyebrow">Live case-resolution proof board</p><h2 id="case-title">RX-1048 · Demo prescription-access case</h2></div>
+          <div>
+            <p class="eyebrow">Live case-resolution proof board</p>
+            <h2 id="case-title">RX-1048 · Demo prescription-access case</h2>
+            <label class="case-picker-label" for="case-picker">Active case</label>
+            <select id="case-picker" class="case-picker" aria-label="Select case"></select>
+          </div>
           <div class="status-wrap"><span class="status" id="case-status">Loading</span><span class="subtitle" id="case-created"></span></div>
         </div>
 

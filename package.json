@@ -5,10 +5,15 @@
   "type": "module",
   "description": "Consent-first voice coordination for prescription access.",
   "scripts": {
-    "dev": "node server.mjs",
-    "start": "node server.mjs",
+    "dev": "node --env-file-if-exists=.env server.mjs",
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "voice": "node --env-file-if-exists=.env voice-server.mjs",
+    "live:inbound": "node --env-file-if-exists=.env scripts/live-inbound.mjs",
+    "point": "node --env-file-if-exists=.env scripts/point-number.mjs",
+    "verify": "node --env-file-if-exists=.env scripts/verify-number.mjs",
+    "confirm": "node --env-file-if-exists=.env scripts/confirm-number.mjs",
     "test": "node --test",
-    "check": "node --check server.mjs && node --check src/pavo.mjs && node --check src/inference.mjs && node --check src/store.mjs && node --check src/telephony.mjs && node --check public/app.js"
+    "check": "node --check server.mjs && node --check voice-server.mjs && node --check src/pavo.mjs && node --check src/inference.mjs && node --check src/store.mjs && node --check src/telephony.mjs && node --check src/persist.mjs && node --check scripts/live-inbound.mjs && node --check scripts/point-number.mjs && node --check scripts/verify-number.mjs && node --check scripts/confirm-number.mjs && node --check public/app.js"
   },
   "engines": {
     "node": ">=20"

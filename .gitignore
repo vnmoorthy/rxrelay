@@ -1,7 +1,15 @@
+# Secrets — never commit. .env.example is the only tracked env file.
 .env
+.env.*
+!.env.example
+
+# Local case state (contains demo case records)
+data/
+
 .DS_Store
 node_modules/
 coverage/
+*.tmp
 deck/rendered/
 deck/*.pptx
 deck/output/*

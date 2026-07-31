@@ -4,11 +4,15 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CaseStore, PERMITTED_ACTIONS } from "./src/store.mjs";
-import { createTelephonyAdapter, normalizeA1MobileEvent } from "./src/telephony.mjs";
+import { JsonCasePersistence } from "./src/persist.mjs";
+import { createTelephonyAdapter, liveTelephonyMissing, normalizeA1MobileEvent } from "./src/telephony.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "public");
-const store = new CaseStore({ telephony: createTelephonyAdapter() });
+const store = new CaseStore({
+  telephony: createTelephonyAdapter(),
+  persistence: new JsonCasePersistence(),
+});
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "127.0.0.1";
 
@@ -34,16 +38,49 @@ async function body(req) {
     chunks.push(chunk);
   }
   if (!chunks.length) return {};
-  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); }
-  catch { throw new Error("Request body must be valid JSON."); }
+  const raw = Buffer.concat(chunks).toString("utf8");
+  const contentType = String(req.headers["content-type"] || "");
+  if (contentType.includes("application/x-www-form-urlencoded")) return Object.fromEntries(new URLSearchParams(raw));
+  try { return JSON.parse(raw); }
+  catch { throw new Error("Request body must be valid JSON or form data."); }
+}
+
+function xmlEscape(value = "") {
+  return String(value).replace(/[<>&'\"]/g, (character) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" }[character]));
+}
+
+function texml(res, instructions) {
+  res.writeHead(200, { "content-type": "application/xml; charset=utf-8", "cache-control": "no-store" });
+  res.end(`<?xml version="1.0" encoding="UTF-8"?><Response>${instructions}</Response>`);
+}
+
+function voiceBaseUrl() {
+  return (process.env.PUBLIC_APP_URL || `http://${HOST}:${PORT}`).replace(/\/$/, "");
+}
+
+function voiceUrl(pathname, params = {}) {
+  const url = new URL(`${voiceBaseUrl()}${pathname}`);
+  if (process.env.VOICE_WEBHOOK_TOKEN) url.searchParams.set("token", process.env.VOICE_WEBHOOK_TOKEN);
+  for (const [key, value] of Object.entries(params)) if (value) url.searchParams.set(key, value);
+  return url.toString();
+}
+
+function voiceTokenValid(requestUrl) {
+  return !process.env.VOICE_WEBHOOK_TOKEN || requestUrl.searchParams.get("token") === process.env.VOICE_WEBHOOK_TOKEN;
+}
+
+function gather(say, actionUrl) {
+  return `<Gather input="speech" action="${xmlEscape(actionUrl)}" method="POST" timeout="6" speechTimeout="auto" language="en-US"><Say>${xmlEscape(say)}</Say></Gather><Say>I did not hear a response. Please call back when you are ready.</Say>`;
 }
 
 function config() {
   const provider = process.env.TELEPHONY_PROVIDER || "demo";
   const live = provider === "a1mobile" && process.env.ALLOW_LIVE_TELEPHONY === "true";
+  const missing = provider === "a1mobile" ? liveTelephonyMissing() : [];
   return {
-    mode: live ? "live-configured" : "sandbox",
+    mode: live && missing.length === 0 ? "live-configured" : provider === "a1mobile" ? "live-incomplete" : "sandbox",
     provider,
+    liveReadiness: { ready: live && missing.length === 0, missing },
     publicAppUrl: process.env.PUBLIC_APP_URL || `http://localhost:${PORT}`,
     safety: "No clinical advice, prescribing, controlled-medication inventory, or unconsented outreach.",
     permittedActions: PERMITTED_ACTIONS,
@@ -54,9 +91,10 @@ function signatureLooksValid(req, rawBody) {
   const secret = process.env.A1MOBILE_WEBHOOK_SECRET;
   if (!secret) return process.env.ALLOW_LIVE_TELEPHONY !== "true";
   const supplied = req.headers[process.env.A1MOBILE_WEBHOOK_SIGNATURE_HEADER || "x-a1mobile-signature"];
-  if (!supplied || typeof supplied !== "string") return false;
+  if (!supplied || Array.isArray(supplied)) return false;
+  const normalized = supplied.replace(/^sha256=/i, "").trim();
   const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-  try { return crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(expected)); }
+  try { return crypto.timingSafeEqual(Buffer.from(normalized), Buffer.from(expected)); }
   catch { return false; }
 }
 
@@ -139,6 +177,34 @@ const server = http.createServer(async (req, res) => {
     if (pathname === "/api/demo/inbound-call" && req.method === "POST") {
       const payload = await body(req);
       return json(res, 200, await store.inboundTurn(payload));
+    }
+
+    if (pathname === "/voice" && ["GET", "POST"].includes(req.method)) {
+      if (!voiceTokenValid(requestUrl)) return json(res, 401, { error: "Invalid voice webhook token." });
+      const payload = req.method === "POST" ? await body(req) : Object.fromEntries(requestUrl.searchParams);
+      const caseRecord = store.openVoiceCase({ callId: payload.CallSid || payload.call_id, from: payload.From || payload.from });
+      const action = voiceUrl("/voice/turn", { caseId: caseRecord.id });
+      return texml(res, gather("Hi, you reached RxRelay. I can coordinate a prescription access status follow-up. I do not provide medical advice or change prescriptions. To continue, say: I consent to a pharmacy status follow-up and text updates.", action));
+    }
+
+    if (pathname === "/voice/turn" && ["GET", "POST"].includes(req.method)) {
+      if (!voiceTokenValid(requestUrl)) return json(res, 401, { error: "Invalid voice webhook token." });
+      const payload = req.method === "POST" ? await body(req) : Object.fromEntries(requestUrl.searchParams);
+      const caseId = requestUrl.searchParams.get("caseId") || payload.caseId;
+      if (!caseId) return texml(res, "<Say>Your voice session is missing a case reference. Please call again.</Say>");
+      const transcript = payload.SpeechResult || payload.speech_result || payload.transcript || "";
+      const result = await store.handleVoiceTurn({
+        caseId,
+        transcript,
+        asrConfidence: Number(payload.Confidence || payload.confidence || .9),
+        noiseLevel: Number(payload.noiseLevel || .1),
+      });
+      const followUp = result.case.humanReview
+        ? "A human coordinator will review this safely. I will not take further automated action."
+        : result.consentRecorded
+          ? "Your explicit consent is recorded and your RxRelay case is open. I will keep the case open until there is verified evidence."
+          : result.reply;
+      return texml(res, gather(followUp, voiceUrl("/voice/turn", { caseId })));
     }
 
     if (pathname === "/api/telephony/a1mobile/events" && req.method === "POST") {

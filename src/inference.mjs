@@ -32,7 +32,11 @@ export class PavoInferenceEngine {
     const fallback = scriptedVoiceReply(route);
     if (!this.configuredFor(route)) return { text: fallback, source: "local-safe-fallback", model: null };
     const endpoint = `${process.env.PAVO_OPENAI_BASE_URL.replace(/\/$/, "")}/responses`;
-    const input = `${transcript}\n\nCase context: ${caseBrief}\nRoute: ${route.tier}. Guardrail: ${route.guardrail}`;
+    // a1mobile's hackathon gateway implements the Responses endpoint but does
+    // not support the optional `instructions` field. Keep the safety contract
+    // in the single portable input string so it works with both the gateway and
+    // standard OpenAI-compatible deployments.
+    const input = `${SYSTEM_PROMPT}\n\nCaller said: ${transcript}\n\nCase context: ${caseBrief}\nRoute: ${route.tier}. Guardrail: ${route.guardrail}`;
     try {
       const response = await this.fetch(endpoint, {
         method: "POST",
@@ -40,7 +44,7 @@ export class PavoInferenceEngine {
           authorization: `Bearer ${process.env.PAVO_OPENAI_API_KEY}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ model: this.modelFor(route), instructions: SYSTEM_PROMPT, input, max_output_tokens: 160 }),
+        body: JSON.stringify({ model: this.modelFor(route), input, max_output_tokens: 160 }),
       });
       if (!response.ok) throw new Error(`Responses API returned ${response.status}`);
       const text = responseText(await response.json());

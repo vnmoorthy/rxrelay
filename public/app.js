@@ -65,11 +65,29 @@ function render(caseRecord) {
   $("#message-preview").innerHTML = lastMessage ? `${escape(lastMessage.text)}<span class="delivery">${escape(lastMessage.mode)} · consent recorded</span>` : '<span class="message-placeholder">No patient update has been sent.</span>';
 }
 
-async function load() {
-  const [{ case: caseRecord }, configuration] = await Promise.all([request("/api/cases/RX-1048"), request("/api/config")]);
+async function loadCases(preferredId) {
+  const [{ cases }, configuration] = await Promise.all([request("/api/cases"), request("/api/config")]);
   $("#mode-pill").innerHTML = `<span class="pulse"></span>${configuration.mode === "sandbox" ? "Sandbox · no real outreach" : "Live configuration"}`;
-  render(caseRecord);
+  const picker = $("#case-picker");
+  picker.innerHTML = cases.map((item) => `<option value="${escape(item.id)}">${escape(item.id)} · ${escape(item.patient.alias)} · ${escape(item.source)}</option>`).join("");
+  const selected = cases.find((item) => item.id === preferredId) || cases.find((item) => item.source === "voice") || cases.find((item) => item.id === "RX-1048") || cases[0];
+  if (!selected) throw new Error("No cases are available.");
+  picker.value = selected.id;
+  render(selected);
 }
+
+async function load() {
+  await loadCases();
+}
+
+$("#case-picker").addEventListener("change", async (event) => {
+  try {
+    const result = await request(`/api/cases/${encodeURIComponent(event.target.value)}`);
+    render(result.case);
+  } catch (error) {
+    toast(error.message);
+  }
+});
 
 $("#actions").addEventListener("click", async (event) => {
   const button = event.target.closest("[data-action]"); if (!button || button.disabled) return;
@@ -96,3 +114,7 @@ $("#voice-form").addEventListener("submit", async (event) => {
 });
 
 load().catch((error) => { toast(error.message); });
+setInterval(() => {
+  if (!activeCase) return;
+  loadCases(activeCase.id).catch(() => {});
+}, 4000);
