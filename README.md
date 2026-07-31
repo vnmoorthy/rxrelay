@@ -181,7 +181,7 @@ Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · **full diagram:** [
 git clone https://github.com/vnmoorthy/rxrelay.git
 cd rxrelay
 cp .env.example .env
-npm test        # 10 tests · node:test · no install step
+npm test        # 11 tests · node:test · no install step
 npm run dev     # http://localhost:3000
 ```
 
@@ -301,7 +301,7 @@ No tool can bypass the proof gate.
 | --- | --- |
 | Idea & creativity | Moves voice agents from talking → evidence-backed access coordination |
 | Real-world value | Removes patient-as-switchboard work in prescription access |
-| Technical execution | Case state machine, PAVO routing, TeXML gateway, webhook seam, MCP, proof gate, CI + 10 tests |
+| Technical execution | Case state machine, PAVO routing, TeXML gateway, webhook seam, MCP, proof gate, CI + 11 tests |
 | Voice UX | Voice-first consent, confirmation on uncertain critical details, explicit safe stops |
 | Works live | Sandbox E2E today; real inbound TeXML path; live outbound fails closed until provider accepts + returns an id |
 
