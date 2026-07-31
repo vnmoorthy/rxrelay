@@ -1,426 +1,682 @@
+#!/usr/bin/env node
+/**
+ * RxRelay pitch deck — pure Node.js PPTX generator (no external deps).
+ * Also documents deck/pitch.html for fullscreen HTML presentation.
+ */
 import fs from "node:fs/promises";
+import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
-import { Presentation, PresentationFile } from "/Users/moorthy/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/@oai/artifact-tool/dist/artifact_tool.mjs";
 
-const OUT = new URL("./output/", import.meta.url);
-const W = 1280;
-const H = 720;
+const OUT_DIR = fileURLToPath(new URL("./output/", import.meta.url));
+const OUT_FILE = `${OUT_DIR}/RxRelay_Hackathon_Pitch.pptx`;
+
+/** Slide size: standard 16:9 widescreen (EMUs) */
+const W = 9144000;
+const H = 5143500;
+const M = 457200; // 0.5"
+
 const C = {
-  ink: "#0B1F33", dark: "#071A2B", muted: "#5F6D80", pale: "#F3F5F7",
-  panel: "#FFFFFF", rule: "#D8E0E7", teal: "#0E9F8E", tealPale: "#DCF6F0",
-  blue: "#3D8DFF", bluePale: "#E5F0FF", amber: "#E6A037", amberPale: "#FFF1D7",
-  red: "#D35656", redPale: "#FCE6E6", purple: "#7B61D4", purplePale: "#EEE9FF",
+  ink: "04131F",
+  ink2: "0B2436",
+  muted: "8EA0AE",
+  teal: "0F9F8C",
+  tealBright: "39D6C0",
+  paper: "F4F7F9",
+  white: "FFFFFF",
+  red: "C24B45",
+  amber: "D8892A",
 };
 
-async function writeBlob(file, blob) {
-  await fs.writeFile(new URL(file, OUT), new Uint8Array(await blob.arrayBuffer()));
+/** @type {Array<{kicker:string,num:number,title:string,body:string[],footer:string,notes:string,dark?:boolean,bullets?:string[]}>} */
+const SLIDES = [
+  {
+    kicker: "a1mobile Voice AI Hackathon 2026",
+    num: 1,
+    title: "RxRelay",
+    body: ["Proof, not promises.", "A consent-first voice coordinator for prescription access — refuses resolution without evidence."],
+    footer: "Make the calls. Bring the proof.",
+    notes: "Open with the outcome, not 'an AI agent.' One consented request, followed until evidence exists. Pause on 'Proof, not promises.'",
+    dark: true,
+    bullets: ["PAVO routing", "Evidence-gated", "Consent-first"],
+  },
+  {
+    kicker: "The human cost",
+    num: 2,
+    title: "The patient becomes the switchboard.",
+    body: ["When a prescription stalls, the person who needs it repeats the same story across pharmacy, clinic, and insurer."],
+    bullets: [
+      "Pharmacy: \"We need a prior authorization.\"",
+      "Clinic: \"We sent it — call your insurer.\"",
+      "Insurer: \"Ask the pharmacy for the status.\"",
+      "The patient: calling again — no shared state, no owner.",
+    ],
+    footer: "Authorization friction turns patients into unpaid coordinators.",
+    notes: "Community voices make the burden concrete — people call 10, even 20 pharmacies because coordination failed, not because they wanted an agent.",
+    dark: false,
+  },
+  {
+    kicker: "The missing layer",
+    num: 3,
+    title: "LLMs narrate completion. Access problems need evidence.",
+    body: ["Today: call → hold → repeat → hope. No proof the next actor acted.", "With RxRelay: consent → coordinate → verify. One case owns the handoffs."],
+    footer: "From conversational agent to accountable coordination system.",
+    notes: "Land the insight: a smoother bot is not the answer. Operational memory plus an honest completion gate.",
+    dark: true,
+  },
+  {
+    kicker: "The product",
+    num: 4,
+    title: "A consent-first voice coordinator.",
+    body: ["One consented voice request becomes a case with an owner — coordinating status, not medicine."],
+    bullets: ["01 Ask once — narrow, explicit coordination consent", "02 Coordinate — non-clinical status follow-up only", "03 Prove — case open until outcome + patient update"],
+    footer: "The voice layer earns trust by visibly narrowing its authority.",
+    notes: "Walk three verbs slowly. The distinctive thing is the proof condition in step three.",
+    dark: false,
+  },
+  {
+    kicker: "Resolution gate",
+    num: 5,
+    title: "A case turns green only when all four proofs arrive.",
+    body: ["Deterministic close gate — activity is not resolution."],
+    bullets: ["consent ∧ permitted action ∧ counterpart outcome ∧ patient update", "00:00 Consent · 00:20 Pharmacy blocker · 00:45 Clinic · 01:10 Verify · 01:22 Patient SMS"],
+    footer: "No evidence missing. Case can turn green.",
+    notes: "Every green check is a deterministic state transition, not an LLM confidence score. Run the dashboard live.",
+    dark: true,
+  },
+  {
+    kicker: "PAVO routing",
+    num: 6,
+    title: "The coupling cliff: joint ASR, capture, and reasoning.",
+    body: ["A stronger LLM cannot repair a misheard authorization number."],
+    bullets: [
+      "FAST — greetings / yes-no · compact reasoning",
+      "BALANCED — routine coordination · reliable speech → tools",
+      "VERIFIED — names, dates, prior auth · TeXML speech + DTMF, strong model (not multi-vendor ASR theater)",
+      "SAFE STOP — clinical / unsafe → human queue, no action",
+    ],
+    footer: "Demand-conditioned routing · confidence · noise · critical entities · action risk",
+    notes: "Be honest: verified tier uses TeXML speech + DTMF and a strong model. The coupling cliff is real — joint capture and reasoning matter.",
+    dark: true,
+  },
+  {
+    kicker: "Live surfaces",
+    num: 7,
+    title: "Every stakeholder sees the same evidence.",
+    bullets: [
+      "Proof board — lanes, timeline, 4/4 gate",
+      "Counterpart portal — structured pharmacy / clinic outcomes",
+      "Signed receipts — audit trail for consent and action",
+      "Human ops queue — escalation for ambiguous / clinical",
+      "SSE stream — live case updates, no pre-baked animation",
+    ],
+    footer: "UI actions hit the real demo state machine.",
+    notes: "Walk each surface: proof board, counterpart portal, signed receipts, human queue, SSE.",
+    dark: false,
+  },
+  {
+    kicker: "Architecture",
+    num: 8,
+    title: "Voice-server blast radius. Dashboard stays local.",
+    body: ["LLM proposes language. Policy + evidence decide what may happen. Public tunnel never reaches dashboard."],
+    bullets: [
+      "Public edge: OTP caller · Cloudflare → :3001 · a1mobile TeXML",
+      "Voice process: voice-server.mjs · consent parse · safe stop",
+      "Core: PAVO router · inference · CaseStore proof gate",
+      "Dashboard local :3000 · MCP/API · telephony sandbox default",
+      "Proof flags never set by model text alone",
+    ],
+    footer: "Blast radius of public URL = three TeXML routes.",
+    notes: "Walk left→right. Red safe-stop path never touches live outreach. Live requires OTP allowlist.",
+    dark: true,
+  },
+  {
+    kicker: "Trust by construction",
+    num: 9,
+    title: "What we refuse.",
+    body: ["Aggressively useful inside a narrow boundary — visibly humble outside it."],
+    bullets: [
+      "CAN: record consent · check status · document outcomes · send consented updates",
+      "WILL NOT: clinical advice · Rx changes · controlled inventory · unconsented contact",
+    ],
+    footer: "The wow factor is knowing when not to act.",
+    notes: "Product position, not disclaimer. A safe stop is success when automation would be wrong.",
+    dark: false,
+  },
+  {
+    kicker: "Demo path",
+    num: 10,
+    title: "Sandbox E2E + live call flow.",
+    bullets: [
+      "Dashboard: npm run dev → proof board → counterpart actions → 4/4 gate → SSE",
+      "Voice: npm run voice → tunnel :3001 → TeXML → consent → PAVO → case transitions",
+      "Safe branch → green · unsafe branch → human queue · call the claimed number",
+    ],
+    footer: "Judged flow is deterministic, visible, and safe end-to-end.",
+    notes: "Offer live path: reset sandbox, walk full flow, call demo line, show unsafe branch stays red.",
+    dark: true,
+  },
+  {
+    kicker: "Why invest / Catalyst fit",
+    num: 11,
+    title: "Evidence culture. Load-bearing network. Open research.",
+    bullets: [
+      "Evidence culture — proof gates, signed receipts, Groundtruth / MCP Observatory discipline",
+      "a1 network — TeXML voice, OTP SMS, number verify — real telco primitives",
+      "Open research PAVO — paper + pavo-bench benchmark alongside product",
+    ],
+    footer: "Real problem · real voice UX · real safety · it actually runs.",
+    notes: "Catalyst fit: evidence over demo theater, a1 as load-bearing infra, open PAVO research lineage.",
+    dark: false,
+  },
+  {
+    kicker: "Ask",
+    num: 12,
+    title: "A prescription should not fail because coordination did.",
+    body: ["RxRelay turns a consented call into a verifiable outcome."],
+    bullets: [
+      "github.com/vnmoorthy/rxrelay",
+      "openreview.net/forum?id=zrneoIxlFx · PAVO paper",
+      "Next: live OTP SMS + production tunnel",
+    ],
+    footer: "RxRelay · Proof, not promises.",
+    notes: "End on conviction. Invite judges to live board and safety stop. Next: OTP SMS + production tunnel.",
+    dark: true,
+  },
+];
+
+// ── CRC32 ──────────────────────────────────────────────────────────────────
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[i] = c;
+  }
+  return t;
+})();
+
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
 }
 
-function rect(slide, x, y, w, h, fill, options = {}) {
-  return slide.shapes.add({
-    geometry: options.geometry || "rect",
-    name: options.name,
-    position: { left: x, top: y, width: w, height: h },
-    fill,
-    line: { style: "solid", fill: options.line ?? fill, width: options.lineWidth ?? 0 },
-    borderRadius: options.radius || undefined,
-    shadow: options.shadow || undefined,
-  });
+// ── ZIP writer (store method 0 + deflate method 8) ─────────────────────────
+class ZipWriter {
+  /** @type {{name:string,data:Buffer}[]} */
+  #files = [];
+
+  add(name, data) {
+    this.#files.push({ name, data: Buffer.isBuffer(data) ? data : Buffer.from(data, "utf8") });
+  }
+
+  toBuffer() {
+    const locals = [];
+    const central = [];
+    let offset = 0;
+
+    for (const { name, data } of this.#files) {
+      const nameBuf = Buffer.from(name, "utf8");
+      const compressed = zlib.deflateRawSync(data, { level: 9 });
+      const checksum = crc32(data);
+      const local = Buffer.alloc(30 + nameBuf.length + compressed.length);
+      let p = 0;
+      local.writeUInt32LE(0x04034b50, p); p += 4;
+      local.writeUInt16LE(20, p); p += 2;
+      local.writeUInt16LE(0x0800, p); p += 2; // UTF-8 flag
+      local.writeUInt16LE(8, p); p += 2; // deflate
+      local.writeUInt16LE(0, p); p += 2;
+      local.writeUInt16LE(0, p); p += 2;
+      local.writeUInt32LE(checksum, p); p += 4;
+      local.writeUInt32LE(compressed.length, p); p += 4;
+      local.writeUInt32LE(data.length, p); p += 4;
+      local.writeUInt16LE(nameBuf.length, p); p += 2;
+      local.writeUInt16LE(0, p); p += 2;
+      nameBuf.copy(local, p); p += nameBuf.length;
+      compressed.copy(local, p);
+      locals.push(local);
+
+      const cen = Buffer.alloc(46 + nameBuf.length);
+      p = 0;
+      cen.writeUInt32LE(0x02014b50, p); p += 4;
+      cen.writeUInt16LE(20, p); p += 2;
+      cen.writeUInt16LE(20, p); p += 2;
+      cen.writeUInt16LE(0x0800, p); p += 2;
+      cen.writeUInt16LE(8, p); p += 2;
+      cen.writeUInt16LE(0, p); p += 2;
+      cen.writeUInt16LE(0, p); p += 2;
+      cen.writeUInt32LE(checksum, p); p += 4;
+      cen.writeUInt32LE(compressed.length, p); p += 4;
+      cen.writeUInt32LE(data.length, p); p += 4;
+      cen.writeUInt16LE(nameBuf.length, p); p += 2;
+      cen.writeUInt16LE(0, p); p += 2;
+      cen.writeUInt16LE(0, p); p += 2;
+      cen.writeUInt16LE(0, p); p += 2;
+      cen.writeUInt16LE(0, p); p += 2;
+      cen.writeUInt32LE(0, p); p += 4;
+      cen.writeUInt32LE(offset, p); p += 4;
+      nameBuf.copy(cen, p);
+      central.push(cen);
+      offset += local.length;
+    }
+
+    const centralSize = central.reduce((s, b) => s + b.length, 0);
+    const centralStart = offset;
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0);
+    end.writeUInt16LE(0, 4);
+    end.writeUInt16LE(0, 6);
+    end.writeUInt16LE(this.#files.length, 8);
+    end.writeUInt16LE(this.#files.length, 10);
+    end.writeUInt32LE(centralSize, 12);
+    end.writeUInt32LE(centralStart, 16);
+    end.writeUInt16LE(0, 20);
+
+    return Buffer.concat([...locals, ...central, end]);
+  }
 }
 
-function text(slide, value, x, y, w, h, options = {}) {
-  const shape = slide.shapes.add({
-    geometry: "textbox",
-    name: options.name,
-    position: { left: x, top: y, width: w, height: h },
-    fill: "none",
-    line: { style: "solid", fill: "none", width: 0 },
-  });
-  shape.text = value;
-  shape.text.style = {
-    fontFace: "Helvetica Neue",
-    fontSize: options.size ?? 16,
-    color: options.color ?? C.ink,
-    bold: options.bold ?? false,
-    italic: options.italic ?? false,
-    alignment: options.align ?? "left",
-  };
-  return shape;
+// ── OOXML helpers ──────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-function rule(slide, x, y, w, color = C.rule, h = 1) { return rect(slide, x, y, w, h, color); }
-function dot(slide, x, y, color = C.teal, size = 10) { return rect(slide, x, y, size, size, color, { geometry: "ellipse" }); }
-
-function header(slide, kicker, number, dark = false) {
-  const fg = dark ? "#ECF5FF" : C.ink;
-  const muted = dark ? "#A8BACB" : C.muted;
-  text(slide, kicker.toUpperCase(), 48, 33, 620, 18, { size: 10, bold: true, color: muted });
-  text(slide, `RXRELAY  /  ${String(number).padStart(2, "0")}`, 1012, 33, 220, 18, { size: 10, bold: true, color: muted, align: "right" });
-  rule(slide, 48, 58, 1184, dark ? "#294257" : C.rule);
-  return fg;
+function solidFill(hex) {
+  return `<a:solidFill><a:srgbClr val="${hex}"/></a:solidFill>`;
 }
 
-function footer(slide, message, dark = false) {
-  text(slide, message, 48, 678, 900, 16, { size: 9, color: dark ? "#8BA1B5" : "#8090A1" });
-  text(slide, "A1MOBILE VOICE AI HACKATHON · 2026", 880, 678, 352, 16, { size: 9, color: dark ? "#8BA1B5" : "#8090A1", align: "right" });
+/** @param {{text:string,size?:number,bold?:boolean,color?:string,italic?:boolean}[]} runs */
+function paragraph(runs, align = "l") {
+  const algn = { l: "l", r: "r", ctr: "ctr", left: "l", right: "r", center: "ctr" }[align] || "l";
+  const rs = runs
+    .map((r) => {
+      const sz = r.size ?? 1600;
+      const attrs = [
+        `lang="en-US"`,
+        `sz="${sz}"`,
+        r.bold ? `b="1"` : "",
+        r.italic ? `i="1"` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const fill = r.color ? `<a:solidFill><a:srgbClr val="${r.color}"/></a:solidFill>` : "";
+      return `<a:r><a:rPr ${attrs}>${fill}<a:latin typeface="Calibri"/></a:rPr><a:t>${esc(r.text)}</a:t></a:r>`;
+    })
+    .join("");
+  return `<a:p><a:pPr algn="${algn}"/>${rs}</a:p>`;
 }
 
-function note(slide, message, sources = []) {
-  const sourceBlock = sources.length ? `\n\n[Sources]\n${sources.map((source) => `- ${source}`).join("\n")}\n[/Sources]` : "";
-  slide.speakerNotes.textFrame.setText(`${message}${sourceBlock}`);
-  slide.speakerNotes.setVisible(true);
+function textBody(paragraphs) {
+  return `<p:txBody><a:bodyPr wrap="square" rtlCol="0"/><a:lstStyle/>${paragraphs.join("")}</p:txBody>`;
 }
 
-function pill(slide, value, x, y, w, color, textColor = C.ink) {
-  rect(slide, x, y, w, 25, color, { radius: "rounded-full" });
-  text(slide, value, x + 10, y + 6, w - 20, 15, { size: 10, bold: true, color: textColor, align: "center" });
+function shape(id, name, x, y, cx, cy, paragraphs, { fill = "none", line = "none" } = {}) {
+  const spPr =
+    fill === "none"
+      ? `<p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr>`
+      : `<p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${solidFill(fill)}<a:ln><a:solidFill><a:srgbClr val="${line}"/></a:solidFill></a:ln></p:spPr>`;
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${esc(name)}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>${spPr}${textBody(paragraphs)}</p:sp>`;
 }
 
-function card(slide, x, y, w, h, options = {}) {
-  return rect(slide, x, y, w, h, options.fill || C.panel, { line: options.line || C.rule, lineWidth: 1, radius: "rounded-xl", shadow: options.shadow || "shadow-sm", name: options.name });
+function slideBackground(dark) {
+  const color = dark ? C.ink : C.paper;
+  return `<p:bg><p:bgPr>${solidFill(color)}<a:effectLst/></p:bgPr></p:bg>`;
 }
 
-function title(slide, value, subtitle, options = {}) {
-  const color = options.color || C.ink;
-  text(slide, value, 48, options.y || 92, options.width || 850, options.height || 112, { size: options.size || 53, bold: true, color, name: "title" });
-  if (subtitle) text(slide, subtitle, 48, (options.y || 92) + (options.height || 112) + 12, options.subWidth || 750, 55, { size: options.subSize || 18, color: options.subColor || C.muted, name: "subtitle" });
+function buildSlideXml(slide, slideNum) {
+  const dark = slide.dark !== false;
+  const fg = dark ? C.white : C.ink;
+  const muted = dark ? C.muted : "5C6B78";
+  const accent = C.tealBright;
+  let id = 2;
+  const shapes = [];
+
+  shapes.push(
+    shape(
+      id++,
+      "Kicker",
+      M,
+      180000,
+      W - 2 * M,
+      220000,
+      [paragraph([{ text: slide.kicker.toUpperCase(), size: 900, bold: true, color: accent }])],
+    ),
+  );
+
+  shapes.push(
+    shape(
+      id++,
+      "SlideNum",
+      W - M - 1200000,
+      180000,
+      1200000,
+      220000,
+      [paragraph([{ text: `RXRELAY  /  ${String(slide.num).padStart(2, "0")}`, size: 900, bold: true, color: muted }], "r")],
+    ),
+  );
+
+  shapes.push(
+    shape(
+      id++,
+      "Title",
+      M,
+      520000,
+      W - 2 * M,
+      900000,
+      [paragraph([{ text: slide.title, size: slide.num === 1 ? 5200 : 3600, bold: true, color: fg }])],
+    ),
+  );
+
+  let y = 1500000;
+  for (const line of slide.body ?? []) {
+    shapes.push(
+      shape(id++, "Body", M, y, W - 2 * M, 360000, [
+        paragraph([{ text: line, size: 1800, color: slide.num === 1 && line.startsWith("Proof") ? accent : muted, italic: line.startsWith("Proof") }]),
+      ]),
+    );
+    y += 380000;
+  }
+
+  for (const bullet of slide.bullets ?? []) {
+    shapes.push(
+      shape(id++, "Bullet", M + 80000, y, W - 2 * M - 80000, 320000, [
+        paragraph([{ text: `• ${bullet}`, size: 1500, color: fg }]),
+      ]),
+    );
+    y += 340000;
+  }
+
+  shapes.push(
+    shape(
+      id++,
+      "Footer",
+      M,
+      H - 420000,
+      W - 2 * M,
+      260000,
+      [paragraph([{ text: slide.footer, size: 900, color: muted }])],
+    ),
+  );
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+       xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  ${slideBackground(dark)}
+  <p:cSld name="Slide ${slideNum}">
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${W}" cy="${H}"/><a:chOff x="0" y="0"/><a:chExt cx="${W}" cy="${H}"/></a:xfrm></p:grpSpPr>
+      ${shapes.join("\n      ")}
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sld>`;
 }
 
-function addSlide(presentation, setup) {
-  const slide = presentation.slides.add();
-  setup(slide);
-  return slide;
+function buildNotesXml(slide) {
+  const paras = slide.notes.split(/\n+/).map((t) => paragraph([{ text: t, size: 1400, color: C.ink }]));
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:notes xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+         xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+         xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="6858000" cy="9144000"/><a:chOff x="0" y="0"/><a:chExt cx="6858000" cy="9144000"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="2" name="Notes"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="457200" y="457200"/><a:ext cx="5943600" cy="8229600"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+        ${textBody(paras)}
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:notes>`;
 }
 
-function event(slide, x, y, label, value, tint, accent) {
-  card(slide, x, y, 210, 110, { fill: tint, line: tint });
-  dot(slide, x + 18, y + 18, accent, 9);
-  text(slide, label.toUpperCase(), x + 34, y + 15, 150, 15, { size: 9, bold: true, color: C.muted });
-  text(slide, value, x + 18, y + 48, 174, 42, { size: 16, bold: true, color: C.ink });
+function rel(id, type, target) {
+  return `<Relationship Id="rId${id}" Type="${type}" Target="${target}"/>`;
 }
 
-function slide1(presentation) {
-  addSlide(presentation, (slide) => {
-    slide.background.fill = "#FFFFFF";
-    text(slide, "VOICE COORDINATION FOR PRESCRIPTION ACCESS", 48, 41, 520, 18, { size: 10, bold: true, color: C.muted });
-    text(slide, "RxRelay", 48, 104, 650, 88, { size: 88, bold: true, color: C.ink });
-    text(slide, "Make the calls.", 48, 216, 720, 74, { size: 66, bold: true, color: C.ink });
-    text(slide, "Bring the proof.", 48, 291, 800, 74, { size: 66, italic: true, color: C.teal });
-    text(slide, "A consent-first voice agent that coordinates pharmacy, clinic, and insurer follow-ups—and refuses to call a case resolved without evidence.", 52, 401, 620, 72, { size: 20, color: C.muted });
-    pill(slide, "PAVO-POWERED ROUTING", 51, 510, 210, C.tealPale, C.teal);
-    pill(slide, "EVIDENCE-GATED", 272, 510, 160, C.bluePale, C.blue);
-    card(slide, 814, 118, 352, 420, { fill: C.dark, line: C.dark, shadow: "shadow-lg" });
-    text(slide, "RESOLUTION\nPROOF", 850, 159, 210, 50, { size: 12, bold: true, color: "#9FB6C9" });
-    const checks = ["Consent recorded", "Permitted action", "Counterpart outcome", "Patient update"];
-    checks.forEach((check, index) => {
-      const y = 242 + index * 56;
-      rect(slide, 850, y, 28, 28, C.teal, { geometry: "ellipse" });
-      text(slide, "✓", 857, y + 5, 14, 16, { size: 14, bold: true, color: "#FFFFFF", align: "center" });
-      text(slide, check, 894, y + 5, 220, 20, { size: 16, bold: true, color: "#FFFFFF" });
-    });
-    rule(slide, 850, 481, 280, "#34516A");
-    text(slide, "No evidence missing.\nCase can turn green.", 850, 497, 240, 42, { size: 13, color: "#AEEADE" });
-    footer(slide, "Proof, not promises.");
-    note(slide, "Open with the outcome. Do not start by saying ‘an AI agent.’ Say what becomes possible for someone stranded between systems: one consented request, followed until evidence exists.");
-  });
-}
+function buildPptx() {
+  const zip = new ZipWriter();
+  const slideCount = SLIDES.length;
 
-function slide2(presentation) {
-  addSlide(presentation, (slide) => {
-    slide.background.fill = "#FFFFFF";
-    header(slide, "The human cost", 2);
-    title(slide, "The patient becomes the switchboard.", "When a prescription stalls, the person who needs it is often left to repeat the same story across pharmacy, clinic, and insurer.");
-    const nodes = [
-      { label: "PHARMACY", copy: "“We need a prior authorization.”", x: 50, color: C.amber, tint: C.amberPale },
-      { label: "CLINIC", copy: "“We sent it—call your insurer.”", x: 395, color: C.purple, tint: C.purplePale },
-      { label: "INSURER", copy: "“Ask the pharmacy for the status.”", x: 740, color: C.blue, tint: C.bluePale },
-    ];
-    nodes.forEach((node, index) => {
-      card(slide, node.x, 332, 295, 150, { fill: node.tint, line: node.tint });
-      text(slide, node.label, node.x + 22, 357, 220, 18, { size: 10, bold: true, color: node.color });
-      text(slide, node.copy, node.x + 22, 399, 240, 46, { size: 18, bold: true, color: C.ink });
-      if (index < 2) text(slide, "→", node.x + 302, 389, 30, 26, { size: 28, color: "#A4B0BE", align: "center" });
-    });
-    card(slide, 1086, 265, 146, 286, { fill: C.dark, line: C.dark });
-    text(slide, "THE\nPATIENT", 1107, 300, 100, 45, { size: 11, bold: true, color: "#AEC1D1", align: "center" });
-    rect(slide, 1125, 370, 68, 68, C.teal, { geometry: "ellipse" });
-    text(slide, "?", 1142, 378, 34, 45, { size: 38, bold: true, color: "#FFFFFF", align: "center" });
-    text(slide, "calling\nagain", 1102, 466, 112, 36, { size: 13, color: "#FFFFFF", align: "center" });
-    footer(slide, "Patient-reported experiences point to repeated pharmacy calls during shortage and authorization friction.");
-    note(slide, "Use community voices carefully: these are not prevalence statistics. They make the operational burden emotionally concrete. Say: ‘We heard people describe calling 10, even 20 pharmacies—not because they wanted an agent, but because coordination had failed.’", [
-      "https://www.reddit.com/r/ADHD/comments/1qnsfdc/medication_shortagesstill/ (community report of calling multiple pharmacies)",
-      "https://www.reddit.com/r/ADHD/comments/125349s (community report of calling 20+ pharmacies)"
-    ]);
-  });
-}
+  const contentTypes = [`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+  <Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
+  <Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
+  <Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
+  <Override PartName="/ppt/notesMasters/notesMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"/>`];
 
-function slide3(presentation) {
-  addSlide(presentation, (slide) => {
-    slide.background.fill = C.pale;
-    header(slide, "The missing layer", 3);
-    title(slide, "The problem is not finding a phone number.", "It is closing the loop across institutions—without making the patient prove that every handoff happened.");
-    const left = card(slide, 48, 335, 525, 215, { fill: "#FFFFFF", line: C.rule });
-    text(slide, "TODAY", 74, 362, 120, 16, { size: 10, bold: true, color: C.red });
-    text(slide, "Call → hold → repeat → hope", 74, 404, 430, 58, { size: 27, bold: true });
-    text(slide, "No shared state. No reliable owner. No proof that the next actor actually acted.", 74, 492, 410, 42, { size: 15, color: C.muted });
-    const right = card(slide, 657, 335, 575, 215, { fill: C.dark, line: C.dark });
-    text(slide, "WITH RXRELAY", 685, 362, 170, 16, { size: 10, bold: true, color: "#78E6D4" });
-    text(slide, "Consent → coordinate → verify", 685, 404, 480, 40, { size: 31, bold: true, color: "#FFFFFF" });
-    text(slide, "One case owns the handoffs. The patient sees evidence, not a vague assurance.", 685, 468, 465, 42, { size: 15, color: "#B8CBDB" });
-    rule(slide, 48, 596, 1184, C.rule);
-    text(slide, "THE SHIFT", 48, 622, 160, 15, { size: 10, bold: true, color: C.muted });
-    text(slide, "from a conversational agent to an accountable coordination system", 208, 618, 700, 22, { size: 17, bold: true, color: C.ink });
-    footer(slide, "RxRelay automates only the bounded, non-clinical coordination work.");
-    note(slide, "Land the insight: a smoother bot is not the answer. The solution is an operational memory and an honest completion gate.");
-  });
-}
+  for (let i = 1; i <= slideCount; i++) {
+    contentTypes.push(`  <Override PartName="/ppt/slides/slide${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`);
+    contentTypes.push(`  <Override PartName="/ppt/notesSlides/notesSlide${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>`);
+  }
+  contentTypes.push("</Types>");
 
-function slide4(presentation) {
-  addSlide(presentation, (slide) => {
-    slide.background.fill = "#FFFFFF";
-    header(slide, "The product", 4);
-    title(slide, "One consented voice request becomes a case with an owner.", "RxRelay coordinates status—not medicine—and keeps every participant aligned on the next verified fact.");
-    const steps = [
-      { n: "01", h: "Ask once", b: "Patient speaks naturally. RxRelay captures narrow, explicit coordination consent.", tint: C.bluePale, accent: C.blue },
-      { n: "02", h: "Coordinate", b: "A policy gate permits only non-clinical status follow-up with the pharmacy or clinic.", tint: C.amberPale, accent: C.amber },
-      { n: "03", h: "Prove", b: "The case stays open until the final outcome and patient update are recorded.", tint: C.tealPale, accent: C.teal },
-    ];
-    steps.forEach((step, index) => {
-      const x = 48 + index * 400;
-      card(slide, x, 352, 350, 225, { fill: step.tint, line: step.tint });
-      text(slide, step.n, x + 23, 375, 65, 22, { size: 17, bold: true, color: step.accent });
-      text(slide, step.h, x + 23, 422, 278, 30, { size: 27, bold: true, color: C.ink });
-      text(slide, step.b, x + 23, 472, 280, 60, { size: 14, color: C.muted });
-      if (index < 2) text(slide, "→", x + 355, 445, 32, 28, { size: 26, color: C.rule, align: "center" });
-    });
-    footer(slide, "The voice layer earns trust by visibly narrowing its authority.");
-    note(slide, "Walk the three verbs slowly. It is intentionally not five product features. The distinctive thing is the proof condition in step three.");
-  });
-}
+  zip.add("[Content_Types].xml", contentTypes.join("\n"));
 
-function slide5(presentation) {
-  addSlide(presentation, (slide) => {
-    slide.background.fill = "#FFFFFF";
-    header(slide, "Live in 100 seconds", 5);
-    title(slide, "A case turns green\nonly when evidence arrives.", "The judged flow is deterministic, visible, and safe to run end to end in a sandbox.", { size: 49, height: 140 });
-    const stages = [
-      ["00:00", "Consent", "Patient permits a status follow-up."],
-      ["00:20", "Pharmacy", "Blocker: prior authorization needed."],
-      ["00:45", "Clinic", "Required follow-up is submitted."],
-      ["01:10", "Verify", "Pharmacy confirms readiness."],
-      ["01:22", "Update", "Consented patient SMS is sent."],
-    ];
-    rule(slide, 80, 403, 1120, C.rule, 3);
-    stages.forEach((stage, index) => {
-      const x = 75 + index * 250;
-      dot(slide, x, 397, index === 4 ? C.teal : C.ink, 14);
-      text(slide, stage[0], x, 333, 100, 20, { size: 11, bold: true, color: C.muted });
-      text(slide, stage[1], x, 435, 180, 23, { size: 18, bold: true });
-      text(slide, stage[2], x, 468, 180, 42, { size: 12, color: C.muted });
-    });
-    card(slide, 772, 564, 460, 74, { fill: C.tealPale, line: C.tealPale });
-    text(slide, "✓  4/4 proof conditions complete", 798, 587, 380, 25, { size: 18, bold: true, color: C.teal });
-    footer(slide, "Every UI action hits the real demo case state machine—no pre-baked animation.");
-    note(slide, "Run the dashboard buttons as you narrate this timeline. The visible proof board is the payoff. For the branch that earns trust, take the unsafe voice path and show it stays out of the green state.");
-  });
-}
+  zip.add(
+    "_rels/.rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${rel(1, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument", "ppt/presentation.xml")}
+  ${rel(2, "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties", "docProps/core.xml")}
+  ${rel(3, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties", "docProps/app.xml")}
+</Relationships>`,
+  );
 
-function slide6(presentation) {
-  addSlide(presentation, (slide) => {
-    slide.background.fill = C.pale;
-    header(slide, "The proof board", 6);
-    title(slide, "The interface is designed to make a false “done” impossible.", "Judges can see the exact difference between activity and resolution.", { size: 44, height: 86 });
-    card(slide, 48, 299, 1184, 330, { fill: "#FFFFFF", line: C.rule, shadow: "shadow-md" });
-    text(slide, "RX-1048 · Demo prescription-access case", 76, 326, 510, 25, { size: 16, bold: true });
-    pill(slide, "RESOLUTION VERIFIED", 1010, 320, 184, C.tealPale, C.teal);
-    const lanes = [
-      { label: "PATIENT", title: "Consent recorded", tint: C.bluePale, accent: C.blue, copy: "Status update sent" },
-      { label: "PHARMACY", title: "Ready for pickup", tint: C.amberPale, accent: C.amber, copy: "Outcome confirmed" },
-      { label: "CLINIC / INSURER", title: "PA submitted", tint: C.purplePale, accent: C.purple, copy: "Follow-up recorded" },
-    ];
-    lanes.forEach((lane, index) => {
-      const x = 76 + index * 242;
-      card(slide, x, 377, 218, 200, { fill: lane.tint, line: lane.tint });
-      text(slide, lane.label, x + 17, 399, 175, 15, { size: 9, bold: true, color: lane.accent });
-      text(slide, lane.title, x + 17, 438, 175, 40, { size: 18, bold: true });
-      rule(slide, x + 17, 501, 180, "#FFFFFF", 1);
-      text(slide, lane.copy, x + 17, 522, 174, 25, { size: 12, color: C.muted });
-    });
-    card(slide, 843, 377, 351, 200, { fill: C.dark, line: C.dark });
-    text(slide, "DETERMINISTIC CLOSE GATE", 867, 400, 275, 16, { size: 9, bold: true, color: "#91A9BC" });
-    ["Consent", "Action", "Outcome", "Notification"].forEach((label, index) => {
-      const row = index % 2; const col = Math.floor(index / 2); const x = 867 + col * 152; const y = 444 + row * 49;
-      rect(slide, x, y, 17, 17, C.teal, { geometry: "ellipse" }); text(slide, "✓", x + 3, y + 2, 11, 12, { size: 9, bold: true, color: "#FFFFFF", align: "center" });
-      text(slide, label, x + 24, y + 2, 105, 15, { size: 11, bold: true, color: "#FFFFFF" });
-    });
-    footer(slide, "The product language is intentionally evidence-centric: record, confirm, notify, prove.");
-    note(slide, "This slide is a product screenshot re-created as editable presentation objects. Emphasize that every green check is a deterministic state transition, not an LLM confidence score.");
-  });
-}
+  zip.add(
+    "docProps/core.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+  xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>RxRelay Hackathon Pitch</dc:title>
+  <dc:creator>RxRelay</dc:creator>
+  <dc:description>Proof, not promises — consent-first voice coordination</dc:description>
+  <cp:lastModifiedBy>build-deck.mjs</cp:lastModifiedBy>
+</cp:coreProperties>`,
+  );
 
-function slide7(presentation) {
-  addSlide(presentation, (slide) => {
-    slide.background.fill = C.dark;
-    header(slide, "Why PAVO", 7, true);
-    title(slide, "When the audio gets risky,\nupgrade the whole pipeline.", "A stronger LLM cannot repair a misheard authorization number.", { color: "#FFFFFF", subColor: "#B7C9D9", size: 50, height: 105 });
-    const tiers = [
-      ["FAST", "Greetings / yes-no", "Fast ASR → compact reasoning", "#274A64", "#D6E3EE"],
-      ["BALANCED", "Routine coordination", "Reliable ASR → tools", "#2E6075", "#D6F0F2"],
-      ["VERIFIED", "Names · dates · prior auth · noise", "High-accuracy ASR → structured verifier", C.teal, "#FFFFFF"],
-      ["SAFE STOP", "Clinical or unsafe request", "No action → safe script → human", "#A04C50", "#FFFFFF"],
-    ];
-    tiers.forEach((tier, index) => {
-      const x = 48 + index * 300;
-      card(slide, x, 365, 270, 185, { fill: tier[3], line: tier[3] });
-      text(slide, tier[0], x + 19, 390, 220, 18, { size: 11, bold: true, color: tier[4] });
-      text(slide, tier[1], x + 19, 427, 225, 42, { size: 17, bold: true, color: "#FFFFFF" });
-      rule(slide, x + 19, 486, 220, "#FFFFFF", 1);
-      text(slide, tier[2], x + 19, 507, 224, 30, { size: 11, color: "#FFFFFF" });
-    });
-    text(slide, "DEMAND-CONDITIONED ROUTING  •  CONFIDENCE  •  NOISE  •  CRITICAL ENTITIES  •  ACTION RISK", 48, 607, 1050, 17, { size: 10, bold: true, color: "#8AA4B8" });
-    footer(slide, "PAVO-inspired routing keeps fast turns fast—and raises assurance only when needed.", true);
-    note(slide, "Explain PAVO in plain language. We do not just route an uncertain turn to a bigger model. We select a safer end-to-end pipeline: transcription, reasoning, structured verification, and a safe stop when the work should remain human.", [
-      "https://openreview.net/forum?id=zrneoIxlFx (PAVO: Pipeline-Aware Voice Orchestration with Demand-Conditioned Inference Routing)",
-      "https://github.com/vnmoorthy/pavo-bench (benchmark and reference implementation)"
-    ]);
-  });
-}
+  zip.add(
+    "docProps/app.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">
+  <Application>Node.js</Application>
+  <Slides>${slideCount}</Slides>
+  <PresentationFormat>On-screen Show (16:9)</PresentationFormat>
+</Properties>`,
+  );
 
-function node(slide, x, y, w, h, label, copy, tint = "#FFFFFF", accent = C.ink, bodyColor = C.ink) {
-  const shape = card(slide, x, y, w, h, { fill: tint, line: tint, name: label });
-  text(slide, label.toUpperCase(), x + 15, y + 14, w - 30, 14, { size: 9, bold: true, color: accent });
-  text(slide, copy, x + 15, y + 38, w - 30, h - 48, { size: 12, bold: true, color: bodyColor });
-  return shape;
-}
+  zip.add(
+    "ppt/theme/theme1.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="RxRelay">
+  <a:themeElements>
+    <a:clrScheme name="RxRelay">
+      <a:dk1><a:srgbClr val="${C.ink}"/></a:dk1>
+      <a:lt1><a:srgbClr val="${C.white}"/></a:lt1>
+      <a:dk2><a:srgbClr val="${C.ink2}"/></a:dk2>
+      <a:lt2><a:srgbClr val="${C.paper}"/></a:lt2>
+      <a:accent1><a:srgbClr val="${C.teal}"/></a:accent1>
+      <a:accent2><a:srgbClr val="${C.tealBright}"/></a:accent2>
+      <a:accent3><a:srgbClr val="${C.amber}"/></a:accent3>
+      <a:accent4><a:srgbClr val="${C.red}"/></a:accent4>
+      <a:accent5><a:srgbClr val="2F6FBF"/></a:accent5>
+      <a:accent6><a:srgbClr val="${C.muted}"/></a:accent6>
+      <a:hlink><a:srgbClr val="${C.tealBright}"/></a:hlink>
+      <a:folHlink><a:srgbClr val="${C.teal}"/></a:folHlink>
+    </a:clrScheme>
+    <a:fontScheme name="RxRelay">
+      <a:majorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>
+      <a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>
+    </a:fontScheme>
+    <a:fmtScheme name="Office">
+      <a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst>
+      <a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst>
+      <a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst>
+      <a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst>
+    </a:fmtScheme>
+  </a:themeElements>
+</a:theme>`,
+  );
 
-function slide8(presentation) {
-  addSlide(presentation, (slide) => {
-    slide.background.fill = "#071829";
-    text(slide, "ARCHITECTURE", 48, 28, 220, 16, { size: 10, bold: true, color: "#7CE7D5" });
-    text(slide, "RXRELAY  /  08", 1012, 28, 220, 16, { size: 10, bold: true, color: "#8BA1B5", align: "right" });
-    text(slide, "A voice agent with a real trust boundary.", 48, 52, 900, 36, { size: 28, bold: true, color: "#FFFFFF" });
-    text(slide, "LLM proposes language. Deterministic policy + evidence decide what may happen. Public tunnel never reaches the dashboard.", 48, 90, 1100, 28, { size: 13, color: "#A8BACB" });
+  zip.add(
+    "ppt/slideMasters/slideMaster1.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>
+    <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+    <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${W}" cy="${H}"/><a:chOff x="0" y="0"/><a:chExt cx="${W}" cy="${H}"/></a:xfrm></p:grpSpPr>
+  </p:spTree></p:cSld>
+  <p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>
+  <p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst>
+</p:sldMaster>`,
+  );
 
-    text(slide, "PUBLIC EDGE", 48, 132, 160, 14, { size: 9, bold: true, color: "#7CE7D5" });
-    text(slide, "VOICE PROCESS", 280, 132, 160, 14, { size: 9, bold: true, color: "#7CE7D5" });
-    text(slide, "SHARED CORE", 520, 132, 160, 14, { size: 9, bold: true, color: "#7CE7D5" });
-    text(slide, "DASHBOARD / MCP", 780, 132, 180, 14, { size: 9, bold: true, color: "#7CE7D5" });
-    text(slide, "COUNTERPARTS", 1040, 132, 160, 14, { size: 9, bold: true, color: "#7CE7D5" });
+  zip.add(
+    "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${rel(1, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout", "../slideLayouts/slideLayout1.xml")}
+  ${rel(2, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme", "../theme/theme1.xml")}
+</Relationships>`,
+  );
 
-    const caller = node(slide, 40, 160, 200, 78, "Caller", "OTP-verified phone\nconsented speech", "#12324A", "#7CE7D5", "#EAF7FF");
-    const tunnel = node(slide, 40, 260, 200, 78, "Quick tunnel", "Cloudflare → :3001 only\nnever exposes dashboard", "#12324A", "#7CE7D5", "#EAF7FF");
-    const a1 = node(slide, 40, 360, 200, 78, "a1mobile / Telnyx", "TeXML Gather + SpeechResult\nclaim · point · SMS APIs", "#12324A", "#7CE7D5", "#EAF7FF");
+  zip.add(
+    "ppt/slideLayouts/slideLayout1.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="blank" preserve="1">
+  <p:cSld name="Blank"><p:spTree>
+    <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+    <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${W}" cy="${H}"/><a:chOff x="0" y="0"/><a:chExt cx="${W}" cy="${H}"/></a:xfrm></p:grpSpPr>
+  </p:spTree></p:cSld>
+  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sldLayout>`,
+  );
 
-    const voice = node(slide, 270, 160, 210, 110, "voice-server.mjs", "/voice · /voice/turn · /health\ntoken-gated TeXML only", "#0E4A44", "#7CE7D5", "#EAF7FF");
-    const consent = node(slide, 270, 295, 210, 95, "Consent parse", "explicit phrase + scope\nvague “yes” rejected", "#3A1F24", "#F0A0A0", "#FFE8E8");
-    const safe = node(slide, 270, 415, 210, 95, "Safe stop", "clinical / emergency / Rx change\n→ human review, no action", "#3A1F24", "#F0A0A0", "#FFE8E8");
+  zip.add(
+    "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${rel(1, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster", "../slideMasters/slideMaster1.xml")}
+</Relationships>`,
+  );
 
-    const pavo = node(slide, 510, 160, 230, 100, "PAVO router", "confidence · noise · entities\nfast / balanced / verified / stop", "#0E4A44", "#7CE7D5", "#EAF7FF");
-    const infer = node(slide, 510, 282, 230, 90, "Inference", "a1 Responses gateway\n+ local safe fallback", "#12324A", "#9FB6C9", "#EAF7FF");
-    const store = node(slide, 510, 392, 230, 118, "CaseStore + proof gate", "consent ∧ action ∧ outcome ∧ update\npersist → data/cases.json", "#1B3A5C", "#7CE7D5", "#EAF7FF");
+  zip.add(
+    "ppt/notesMasters/notesMaster1.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:notesMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld><p:spTree>
+    <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+    <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="6858000" cy="9144000"/><a:chOff x="0" y="0"/><a:chExt cx="6858000" cy="9144000"/></a:xfrm></p:grpSpPr>
+  </p:spTree></p:cSld>
+  <p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>
+</p:notesMaster>`,
+  );
 
-    const board = node(slide, 770, 160, 230, 95, "Proof board", "lanes · timeline · 4/4 gate\npublic/ on :3000", "#12324A", "#9FB6C9", "#EAF7FF");
-    const mcp = node(slide, 770, 275, 230, 95, "MCP /api", "create · consent · coordinate\noutcome · brief — same gate", "#12324A", "#9FB6C9", "#EAF7FF");
-    const tel = node(slide, 770, 390, 230, 120, "telephony.mjs", "sandbox adapter by default\nlive fails closed without\nOTP allowlist + provider id", "#3A2A12", "#E6A037", "#FFF4E0");
+  zip.add(
+    "ppt/notesMasters/_rels/notesMaster1.xml.rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${rel(1, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme", "../theme/theme1.xml")}
+</Relationships>`,
+  );
 
-    const pharm = node(slide, 1030, 160, 210, 90, "Pharmacy", "status / blocker / ready\nsandbox or live action", "#3A2A12", "#E6A037", "#FFF4E0");
-    const clinic = node(slide, 1030, 275, 210, 90, "Clinic / insurer", "PA / follow-up recorded\nas counterpart outcome", "#1B3A5C", "#3D8DFF", "#EAF7FF");
-    const sms = node(slide, 1030, 390, 210, 90, "Patient SMS", "only after proof path\nOTP-verified recipient", "#0E4A44", "#7CE7D5", "#EAF7FF");
-    const human = node(slide, 1030, 505, 210, 78, "Human owner", "escalation queue\nambiguous / urgent / clinical", "#3A1F24", "#F0A0A0", "#FFE8E8");
+  for (let i = 0; i < slideCount; i++) {
+    const n = i + 1;
+    zip.add(`ppt/slides/slide${n}.xml`, buildSlideXml(SLIDES[i], n));
+    zip.add(`ppt/notesSlides/notesSlide${n}.xml`, buildNotesXml(SLIDES[i]));
+  }
 
-    const connector = (a, b, from, to, color = "#38506A") => slide.shapes.connect(a, b, { kind: "elbow", fromSide: from, toSide: to, line: { style: "solid", fill: color, width: 2 }, head: { type: "arrow", width: "sm", length: "sm" } });
-    connector(caller, tunnel, "bottom", "top", "#7CE7D5");
-    connector(tunnel, voice, "right", "left", "#7CE7D5");
-    connector(a1, tunnel, "top", "bottom", "#5F6D80");
-    connector(voice, consent, "bottom", "top", "#F0A0A0");
-    connector(voice, pavo, "right", "left", "#7CE7D5");
-    connector(consent, safe, "bottom", "top", "#F0A0A0");
-    connector(pavo, infer, "bottom", "top", "#9FB6C9");
-    connector(infer, store, "bottom", "top", "#7CE7D5");
-    connector(store, board, "right", "left", "#9FB6C9");
-    connector(store, mcp, "right", "left", "#9FB6C9");
-    connector(store, tel, "right", "left", "#E6A037");
-    connector(tel, pharm, "right", "left", "#E6A037");
-    connector(tel, clinic, "right", "left", "#3D8DFF");
-    connector(store, sms, "right", "left", "#7CE7D5");
-    connector(safe, human, "right", "left", "#F0A0A0");
+  for (let i = 0; i < slideCount; i++) {
+    const n = i + 1;
+    zip.add(
+      `ppt/slides/_rels/slide${n}.xml.rels`,
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${rel(1, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout", "../slideLayouts/slideLayout1.xml")}
+  ${rel(2, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide", "../notesSlides/notesSlide${n}.xml")}
+</Relationships>`,
+    );
+    zip.add(
+      `ppt/notesSlides/_rels/notesSlide${n}.xml.rels`,
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${rel(1, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster", "../notesMasters/notesMaster1.xml")}
+  ${rel(2, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide", "../slides/slide${n}.xml")}
+</Relationships>`,
+    );
+  }
 
-    text(slide, "Blast radius of a public URL = three TeXML routes. Proof flags are never set by model text. Live outreach requires OTP allowlist.", 48, 620, 1180, 22, { size: 13, bold: true, color: "#D6E8F5" });
-    text(slide, "github.com/vnmoorthy/rxrelay  ·  docs/ARCHITECTURE.md  ·  PAVO paper openreview.net/forum?id=zrneoIxlFx", 48, 655, 1100, 18, { size: 11, color: "#8BA1B5" });
-    text(slide, "A1MOBILE VOICE AI HACKATHON · 2026", 900, 680, 340, 16, { size: 9, color: "#8BA1B5", align: "right" });
-    note(slide, "This is the wow technical slide. Walk left→right: public edge, isolated voice process, shared core, dashboard/MCP, counterparts. Emphasize the red safe-stop path never touches live outreach, and the amber telephony adapter fails closed.", [
-      "https://github.com/vnmoorthy/rxrelay",
-      "https://openreview.net/forum?id=zrneoIxlFx",
-      "https://github.com/vnmoorthy/pavo-bench"
-    ]);
-  });
-}
+  const slideIdBase = 256;
+  const sldIdLst = SLIDES.map((_, i) => `<p:sldId id="${slideIdBase + i}" r:id="rId${i + 1}"/>`).join("");
+  const presRels = SLIDES.map((_, i) =>
+    rel(i + 1, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide", `slides/slide${i + 1}.xml`),
+  ).join("\n  ");
+  const masterRelId = slideCount + 1;
+  const themeRelId = slideCount + 2;
 
-function slide9(presentation) {
-  addSlide(presentation, (slide) => {
-    slide.background.fill = C.pale;
-    header(slide, "Trust by construction", 9);
-    title(slide, "The wow factor is that it knows when not to act.", "RxRelay is aggressively useful inside a narrow boundary—and visibly humble outside it.", { size: 47, height: 92 });
-    const allowed = card(slide, 48, 344, 552, 224, { fill: C.tealPale, line: C.tealPale });
-    text(slide, "CAN DO", 75, 373, 170, 16, { size: 10, bold: true, color: C.teal });
-    ["Record explicit coordination consent", "Check a non-clinical status", "Document counterpart outcomes", "Send a consented patient update"].forEach((value, index) => {
-      dot(slide, 77, 418 + index * 31, C.teal, 11); text(slide, value, 99, 414 + index * 31, 430, 20, { size: 14, bold: true });
-    });
-    const blocked = card(slide, 632, 344, 600, 224, { fill: C.redPale, line: C.redPale });
-    text(slide, "WILL NOT DO", 659, 373, 170, 16, { size: 10, bold: true, color: C.red });
-    ["Give clinical advice or dosing guidance", "Change / transfer a prescription", "Disclose controlled-medication inventory", "Contact an unconsented recipient"].forEach((value, index) => {
-      rect(slide, 660, 418 + index * 31, 11, 11, C.red, { geometry: "ellipse" }); text(slide, "×", 661, 415 + index * 31, 9, 12, { size: 10, bold: true, color: "#FFFFFF", align: "center" });
-      text(slide, value, 682, 414 + index * 31, 470, 20, { size: 14, bold: true });
-    });
-    footer(slide, "A safe stop is a successful outcome when automation would be the wrong thing to do.");
-    note(slide, "The team should say this unprompted. It is not a disclaimer slide; it is our product position. The guardrails make the product deployable in a high-stakes setting.");
-  });
-}
+  zip.add(
+    "ppt/presentation.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" saveSubsetFonts="1">
+  <p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId${masterRelId}"/></p:sldMasterIdLst>
+  <p:sldIdLst>${sldIdLst}</p:sldIdLst>
+  <p:sldSz cx="${W}" cy="${H}" type="screen16x9"/>
+  <p:notesSz cx="6858000" cy="9144000"/>
+  <p:defaultTextStyle>
+    <a:defPPr><a:defRPr lang="en-US"/></a:defPPr>
+  </p:defaultTextStyle>
+</p:presentation>`,
+  );
 
-function slide10(presentation) {
-  addSlide(presentation, (slide) => {
-    slide.background.fill = "#FFFFFF";
-    header(slide, "The ask", 10);
-    text(slide, "A prescription should not\nfail because coordination did.", 48, 100, 815, 130, { size: 48, bold: true, color: C.ink });
-    text(slide, "RxRelay turns a consented call into a verifiable outcome — grounded in PAVO research and the same evidence discipline as Groundtruth, Lifeline, and MCP Observatory.", 52, 255, 760, 55, { size: 16, color: C.muted });
-    card(slide, 50, 340, 380, 150, { fill: C.dark, line: C.dark });
-    text(slide, "LIVE DEMO", 77, 365, 120, 17, { size: 10, bold: true, color: "#7CE7D5" });
-    text(slide, "Proof board + unsafe branch.\nCall the claimed number.", 77, 400, 320, 55, { size: 22, bold: true, color: "#FFFFFF" });
-    card(slide, 450, 340, 380, 150, { fill: C.tealPale, line: C.tealPale });
-    text(slide, "WHY THIS WINS", 478, 365, 180, 17, { size: 10, bold: true, color: C.teal });
-    text(slide, "Real problem. Real voice UX.\nReal safety. It actually runs.", 478, 400, 320, 55, { size: 22, bold: true, color: C.ink });
-    card(slide, 850, 340, 382, 150, { fill: C.bluePale, line: C.bluePale });
-    text(slide, "TRUSTED LINEAGE", 878, 365, 200, 17, { size: 10, bold: true, color: C.blue });
-    text(slide, "PAVO paper · pavo-bench\nGroundtruth · Lifeline · MCPobs", 878, 400, 320, 55, { size: 18, bold: true, color: C.ink });
-    text(slide, "github.com/vnmoorthy/rxrelay", 50, 530, 500, 24, { size: 18, bold: true, color: C.blue });
-    text(slide, "vnmoorthy.github.io/rxrelay", 50, 560, 500, 22, { size: 16, bold: true, color: C.teal });
-    text(slide, "openreview.net/forum?id=zrneoIxlFx  ·  Pitch: deck/output/RxRelay_Hackathon_Pitch.pptx", 50, 600, 900, 18, { size: 12, color: C.muted });
-    footer(slide, "RxRelay · Proof, not promises.");
-    note(slide, "End on conviction. Invite judges to try the live board and the safety stop. Point to the website and the research lineage so this does not look like a one-weekend toy.", [
-      "https://github.com/vnmoorthy/rxrelay",
-      "https://vnmoorthy.github.io/rxrelay/",
-      "https://openreview.net/forum?id=zrneoIxlFx",
-      "https://github.com/vnmoorthy/pavo-bench",
-      "https://github.com/vnmoorthy/groundtruth",
-      "https://github.com/vnmoorthy/lifeline",
-      "https://github.com/vnmoorthy/mcpobservatory"
-    ]);
-  });
+  zip.add(
+    "ppt/_rels/presentation.xml.rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${presRels}
+  ${rel(masterRelId, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster", "slideMasters/slideMaster1.xml")}
+  ${rel(themeRelId, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme", "theme/theme1.xml")}
+</Relationships>`,
+  );
+
+  return zip.toBuffer();
 }
 
 async function main() {
-  await fs.mkdir(OUT, { recursive: true });
-  const presentation = Presentation.create({ slideSize: { width: W, height: H } });
-  [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10].forEach((builder) => builder(presentation));
-  for (const [index, slide] of presentation.slides.items.entries()) {
-    const stem = `slide-${String(index + 1).padStart(2, "0")}`;
-    await writeBlob(`${stem}.png`, await presentation.export({ slide, format: "png", scale: 1 }));
-    await fs.writeFile(new URL(`${stem}.layout.json`, OUT), await (await slide.export({ format: "layout" })).text());
+  await fs.mkdir(OUT_DIR, { recursive: true });
+  const buf = buildPptx();
+  await fs.writeFile(OUT_FILE, buf);
+  const stat = await fs.stat(OUT_FILE);
+  console.log(`Wrote ${SLIDES.length} slides → ${OUT_FILE} (${stat.size} bytes)`);
+  console.log(`HTML deck: deck/pitch.html (open fullscreen, ← → navigate, N for notes)`);
+  if (stat.size < 4096) {
+    console.warn("Warning: output file seems unusually small");
+    process.exitCode = 1;
   }
-  await writeBlob("deck-montage.webp", await presentation.export({ format: "webp", montage: true, scale: 1 }));
-  const pptx = await PresentationFile.exportPptx(presentation);
-  await pptx.save(fileURLToPath(new URL("RxRelay_Hackathon_Pitch.pptx", OUT)));
-  console.log(`Wrote ${presentation.slides.items.length} slides to ${fileURLToPath(OUT)}`);
 }
 
-main().catch((error) => { console.error(error); process.exitCode = 1; });
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

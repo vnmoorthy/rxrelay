@@ -1,3 +1,7 @@
+## 0.2 Completeness surge
+
+Added signed proof receipts, counterpart attestation portal, human ops queue, timeout escalation, live SSE, verified speech+DTMF capture, redesigned site, portable 12-slide HTML+PPTX deck.
+
 # RxRelay — Cursor continuation handoff
 
 > **Status as of 2026-07-31 (updated):** local product + model gateway + shared case persistence are working. Live inbound TeXML is runnable with `npm run live:inbound` (voice-only Cloudflare quick tunnel + automatic `POST /api/numbers/point`). Outbound live SMS/calls still need OTP-verified recipients and a confirmed call-action endpoint.
@@ -67,7 +71,7 @@ Primary documentation:
   - Explicit scoped consent such as “I consent to a pharmacy status follow-up and text updates” is recorded; vague “yes” is not.
   - The next response is generated through PAVO routing and the configured model gateway.
 - Live inbound helper: `npm run live:inbound` starts voice on `VOICE_PORT` (default 3001), opens a quick tunnel, and points the claimed number with `POST https://hack.a1mobile.com/api/numbers/point` `{ webhook_url }`.
-- `npm test`: **11 passing, 0 failing**.
+- `npm test`: **17 passing, 0 failing**.
 - `npm run check`: passing.
 
 ### Important correctness choices

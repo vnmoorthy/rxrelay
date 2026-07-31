@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>RxRelay — proof-gated voice coordination, powered by PAVO</title>
-<meta name="description" content="RxRelay is a consent-first voice coordinator for prescription access. Demand-conditioned PAVO routing upgrades ASR and reasoning together. A case closes only on proven evidence." />
-<meta name="theme-color" content="#04131f" />
+<title>RxRelay — proof-gated prescription-access coordination</title>
+<meta name="description" content="RxRelay coordinates prescription-access follow-ups with explicit consent and refuses to close a case until consent, action, counterpart outcome, and patient update are proven on the record." />
+<meta name="theme-color" content="#020f14" />
 <link rel="canonical" href="https://vnmoorthy.github.io/rxrelay/" />
 <meta property="og:type" content="website" />
-<meta property="og:title" content="RxRelay — a voice agent that has to prove it helped" />
-<meta property="og:description" content="PAVO-powered, consent-first prescription-access coordination. Cases close only when consent ∧ action ∧ outcome ∧ update are proven." />
+<meta property="og:title" content="RxRelay — proof, not promises" />
+<meta property="og:description" content="Consent-first voice coordination for prescription access. PAVO demand routing upgrades TeXML speech capture and reasoning together. Cases close only on evidence." />
 <meta property="og:url" content="https://vnmoorthy.github.io/rxrelay/" />
 <meta property="og:image" content="https://vnmoorthy.github.io/rxrelay/assets/social-preview.png" />
 <meta name="twitter:card" content="summary_large_image" />
@@ -17,169 +17,366 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2304131f'/%3E%3Cpath d='M9 23V8h7.1c3.2 0 5.2 1.8 5.2 4.5 0 2.5-1.7 4.2-4.2 4.5L22 23h-3.6l-4.3-5.6H12.2V23z' fill='%2339d6c0'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23020f14'/%3E%3Cpath d='M9 23V8h7.1c3.2 0 5.2 1.8 5.2 4.5 0 2.5-1.7 4.2-4.2 4.5L22 23h-3.6l-4.3-5.6H12.2V23z' fill='%232dd4bf'/%3E%3C/svg%3E" />
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="nav">
   <div class="wrap nav-inner">
-    <a class="brand" href="#top"><span class="brand-mark">Rx</span><span>RxRelay</span></a>
+    <a class="brand" href="#top" aria-label="RxRelay home">
+      <span class="brand-mark" aria-hidden="true">Rx</span>
+      <span class="brand-name">RxRelay</span>
+    </a>
+
+    <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true" />
+    <label for="nav-toggle" class="nav-burger" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </label>
+
     <nav class="nav-links" aria-label="Primary">
+      <a href="#problem">Problem</a>
       <a href="#pavo">PAVO</a>
       <a href="#proof">Proof gate</a>
+      <a href="#product">Product</a>
       <a href="#architecture">Architecture</a>
       <a href="#demo">Demo</a>
+      <a href="#invest">Why a1mobile</a>
     </nav>
+
     <a class="btn btn-sm" href="https://github.com/vnmoorthy/rxrelay">GitHub</a>
   </div>
 </header>
 
 <main id="main">
 <section class="hero" id="top">
-  <div class="hero-orb hero-orb-a" aria-hidden="true"></div>
-  <div class="hero-orb hero-orb-b" aria-hidden="true"></div>
-  <div class="wrap hero-grid">
-    <div class="hero-copy">
-      <p class="eyebrow"><span class="pulse"></span> Built on PAVO · TMLR 2026 · a1mobile Voice AI Hackathon</p>
-      <h1>A voice agent that has to <em>prove</em> it helped.</h1>
-      <p class="lede">
-        RxRelay coordinates prescription-access follow-ups with explicit consent —
-        and refuses to close a case until the evidence exists.
-        When speech gets uncertain, it upgrades <strong>transcription and reasoning together</strong>,
-        because a stronger LLM cannot repair a misheard authorization number.
-      </p>
-      <div class="cta-row">
-        <a class="btn btn-lg" href="https://github.com/vnmoorthy/rxrelay">View the source</a>
-        <a class="btn btn-ghost" href="https://openreview.net/forum?id=zrneoIxlFx">Read the PAVO paper</a>
-      </div>
-      <ul class="stat-row">
-        <li><strong>4</strong><span>proof checks to close</span></li>
-        <li><strong>joint</strong><span>ASR + reasoning upgrade</span></li>
-        <li><strong>0</strong><span>runtime dependencies</span></li>
-      </ul>
+  <div class="hero-atmosphere" aria-hidden="true">
+    <div class="hero-orb hero-orb-a"></div>
+    <div class="hero-orb hero-orb-b"></div>
+    <div class="hero-grid-pattern"></div>
+    <div class="hero-scanline"></div>
+  </div>
+
+  <div class="hero-visual" aria-hidden="true">
+    <img src="assets/proof-board.png" alt="" width="1600" height="900" decoding="async" />
+    <div class="hero-visual-veil"></div>
+  </div>
+
+  <div class="wrap hero-stage">
+    <p class="hero-brand" aria-label="RxRelay">
+      <span class="brand-mark brand-mark-lg" aria-hidden="true">Rx</span>
+      <span class="hero-brand-text">RxRelay</span>
+    </p>
+    <h1>Proof, not promises.</h1>
+    <p class="hero-support">Consent-first voice coordination for prescription access — a case closes only when the evidence exists.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/vnmoorthy/rxrelay">View source</a>
+      <a class="btn btn-outline" href="https://openreview.net/forum?id=zrneoIxlFx">PAVO paper</a>
+      <a class="btn btn-outline" href="https://github.com/vnmoorthy/rxrelay/blob/main/deck/output/RxRelay_Hackathon_Pitch.pptx">Pitch deck</a>
     </div>
-    <aside class="hero-panel" aria-label="Live proof equation">
-      <p class="panel-kicker">Resolution proof</p>
-      <ol class="proof-eq">
-        <li class="on"><span>01</span> Consent recorded</li>
-        <li class="on"><span>02</span> Permitted action</li>
-        <li class="on"><span>03</span> Counterpart outcome</li>
-        <li><span>04</span> Patient update</li>
-      </ol>
-      <p class="panel-foot">consent ∧ action ∧ outcome ∧ update → verified</p>
-      <p class="panel-note">An LLM never sets these flags. A pure function over recorded state does.</p>
-    </aside>
   </div>
 </section>
 
-<section class="band dark" id="pavo">
+<section class="band" id="problem">
   <div class="wrap">
-    <p class="section-kicker">Research foundation</p>
-    <h2>PAVO is not a sticker. It is the routing law.</h2>
-    <p class="section-lede">
-      From <a href="https://openreview.net/forum?id=zrneoIxlFx">PAVO: Pipeline-Aware Voice Orchestration with Demand-Conditioned Inference Routing</a>
-      (VeiluKanthaPerumal &amp; Imthathullah, TMLR 2026): upstream ASR quality bounds what a downstream
-      LLM can recover. RxRelay implements that coupling constraint in production voice turns.
+    <p class="kicker">The problem</p>
+    <h2>A prescription can be approved and still unreachable.</h2>
+    <p class="lede">
+      Prior authorization stalls. Inventory shifts. A form never arrives. The patient becomes the switchboard —
+      calling pharmacy, clinic, insurer, repeating context, and still getting no answer they can trust.
+      Voice agents look like the fix. The failure mode is subtler: an agent that <em>says</em> “I’ve taken care of it”
+      and an agent that <em>actually coordinated something</em> look identical at the transcript layer.
+      In medication access, that gap is the whole risk.
     </p>
-    <div class="pavo-grid">
+    <div class="problem-loop" aria-label="Typical patient coordination loop">
+      <span>Patient calls pharmacy</span>
+      <span class="loop-arrow" aria-hidden="true">→</span>
+      <span>Calls clinic</span>
+      <span class="loop-arrow" aria-hidden="true">→</span>
+      <span>Calls insurer</span>
+      <span class="loop-arrow" aria-hidden="true">→</span>
+      <span>Repeats context</span>
+      <span class="loop-arrow loop-return" aria-hidden="true">↺</span>
+      <span class="loop-still">Still no proof</span>
+    </div>
+  </div>
+</section>
+
+<section class="band band-deep" id="pavo">
+  <div class="wrap">
+    <p class="kicker">PAVO routing</p>
+    <h2>When speech gets risky, upgrade the whole pipeline — honestly.</h2>
+    <p class="lede">
+      Grounded in
+      <a href="https://openreview.net/forum?id=zrneoIxlFx">PAVO: Pipeline-Aware Voice Orchestration with Demand-Conditioned Inference Routing</a>
+      (VeiluKanthaPerumal &amp; Imthathullah, TMLR 2026). The paper’s coupling cliff is empirical:
+      a stronger LLM cannot repair a misheard authorization number once upstream ASR has already lost the fact.
+      RxRelay implements that constraint in production voice turns — without pretending to swap between fictional multi-vendor ASR backends.
+    </p>
+
+    <div class="pavo-honest">
       <article>
-        <h3>Coupling cliff</h3>
-        <p>Paper finding: factual quality collapses as ASR WER rises. RxRelay detects near-cliff turns and jointly upgrades ASR + reasoning — never the LLM alone.</p>
+        <h3>What actually upgrades on a high-demand turn</h3>
+        <p>
+          On the live TeXML path, PAVO selects a <strong>joint capture + reasoning tier</strong>.
+          Verified turns widen the a1mobile <code>&lt;Gather&gt;</code> input from speech-only to
+          <code>speech dtmf</code>, add digit capture for critical references, and route inference to a stronger
+          reasoning model with structured confirmation — together, never one without the other.
+        </p>
       </article>
       <article>
-        <h3>Demand score</h3>
-        <p>Each turn gets a demand score from confidence, noise, critical entities, partner-action risk, and history. High demand → cloud-premium pipeline.</p>
-      </article>
-      <article>
-        <h3>Hard-constraint mask</h3>
-        <p>Clinical advice, emergencies, Rx changes, and controlled-inventory queries never reach action models. Safe-stop is evaluated first.</p>
-      </article>
-      <article>
-        <h3>Paper routes</h3>
-        <p><code>ondevice_fast</code> · <code>hybrid_balanced</code> · <code>cloud_premium</code> · hard-constraint mask — mapped onto Fast / Balanced / Verified / Safe stop.</p>
+        <h3>What we do not claim</h3>
+        <p>
+          There is no runtime hop between competing cloud ASR vendors. Tier labels (<code>edge_fast</code>,
+          <code>hybrid_balanced</code>, <code>cloud_premium</code>) map PAVO paper routes onto
+          <em>TeXML speech settings + model class + confirmation policy</em> inside one orchestrator.
+          The upgrade is real; the vendor carousel is not.
+        </p>
       </article>
     </div>
-    <div class="route-strip">
-      <div><span>Fast</span><small>edge ASR → compact reasoning</small></div>
-      <div><span>Balanced</span><small>hybrid ASR → tool-aware reasoning</small></div>
-      <div class="hi"><span>Verified</span><small>cloud ASR → strong reasoner + verifier</small></div>
-      <div class="stop"><span>Safe stop</span><small>no action → human handoff</small></div>
+
+    <div class="route-ladder" aria-label="PAVO route ladder">
+      <div class="route-step">
+        <span class="route-tag">Fast</span>
+        <p>Low-demand intake — speech gather, compact reasoning, no protected action.</p>
+      </div>
+      <div class="route-step">
+        <span class="route-tag">Balanced</span>
+        <p>Coordination turns — hybrid capture, tool-aware reasoning, permitted status actions only.</p>
+      </div>
+      <div class="route-step route-step-hi">
+        <span class="route-tag">Verified</span>
+        <p>Coupling-cliff risk — speech + DTMF, strong reasoner, confirm-before-act on names, dates, auth numbers.</p>
+      </div>
+      <div class="route-step route-step-stop">
+        <span class="route-tag">Safe stop</span>
+        <p>Clinical advice, emergencies, Rx changes, controlled inventory — human handoff, zero autonomous outreach.</p>
+      </div>
     </div>
+
+    <figure class="figure">
+      <img src="assets/pavo-routing.png" alt="PAVO demand-conditioned routing: Fast, Balanced, Verified, and Safe stop tiers" width="1600" height="900" loading="lazy" />
+      <figcaption>Demand score selects a joint capture + reasoning tier — safe stop is evaluated before any demand math.</figcaption>
+    </figure>
+
     <p class="cite">
       Paper: <a href="https://openreview.net/pdf?id=zrneoIxlFx">openreview.net/pdf?id=zrneoIxlFx</a>
-      · Code &amp; bench: <a href="https://github.com/vnmoorthy/pavo-bench">vnmoorthy/pavo-bench</a>
-      · Dataset: <a href="https://huggingface.co/datasets/vnmoorthy/pavo-bench">HuggingFace PAVO-Bench</a>
+      · Benchmark: <a href="https://github.com/vnmoorthy/pavo-bench">vnmoorthy/pavo-bench</a>
+      · Implementation: <a href="https://github.com/vnmoorthy/rxrelay/blob/main/src/pavo.mjs">src/pavo.mjs</a>
     </p>
   </div>
 </section>
 
 <section class="band" id="proof">
   <div class="wrap">
-    <p class="section-kicker">The differentiator</p>
-    <h2>Medication access should not depend on a patient becoming the switchboard.</h2>
-    <div class="split">
-      <div class="vs bad">
+    <p class="kicker">Proof gate</p>
+    <h2>An LLM never decides a case is resolved.</h2>
+    <p class="lede">
+      Resolution is a pure function over recorded state. Four checks must pass before status becomes
+      <code>resolved</code> — consent, permitted action, counterpart outcome, patient notification.
+      Partial progress stays open. A failed provider call records <strong>no</strong> action evidence.
+      A clinic submission does not imply a ready pharmacy pickup.
+    </p>
+
+    <div class="proof-equation" aria-label="Resolution proof equation">
+      <span class="proof-term">consent recorded</span>
+      <span class="proof-op" aria-hidden="true">∧</span>
+      <span class="proof-term">permitted action</span>
+      <span class="proof-op" aria-hidden="true">∧</span>
+      <span class="proof-term">counterpart outcome</span>
+      <span class="proof-op" aria-hidden="true">∧</span>
+      <span class="proof-term">patient update</span>
+      <span class="proof-arrow" aria-hidden="true">→</span>
+      <span class="proof-result">verified</span>
+    </div>
+
+    <div class="compare">
+      <div class="compare-col compare-bad">
         <h3>Generic voice agent</h3>
         <ul>
-          <li>“I’ll take care of it.”</li>
-          <li>One inference path for every turn</li>
           <li>Conversation ends ⇒ task done</li>
+          <li>One inference path for every turn</li>
           <li>Failed API call still narrates success</li>
+          <li>No third-party attestation path</li>
         </ul>
       </div>
-      <div class="vs good">
+      <div class="compare-col compare-good">
         <h3>RxRelay</h3>
         <ul>
-          <li>“Here is the evidence I can prove.”</li>
-          <li>PAVO joint ASR+reasoning upgrade</li>
           <li>Case stays open until 4/4 proof</li>
-          <li>Provider failure records no action evidence</li>
+          <li>PAVO joint capture + reasoning upgrade</li>
+          <li>Provider failure leaves action flag false</li>
+          <li>Hash-chained receipts export what happened</li>
         </ul>
       </div>
     </div>
-    <figure class="shot">
-      <img src="assets/proof-board.png" alt="RxRelay proof board" width="1600" height="900" loading="lazy" />
-      <figcaption>Deterministic close gate on the live proof board.</figcaption>
+
+    <figure class="figure">
+      <img src="assets/proof-board.png" alt="RxRelay proof board showing deterministic close gate" width="1600" height="900" loading="lazy" />
+      <figcaption>The proof board is the operational surface — every flag is set by state transitions, not model text.</figcaption>
     </figure>
   </div>
 </section>
 
-<section class="band tint" id="architecture">
+<section class="band band-deep" id="product">
   <div class="wrap">
-    <p class="section-kicker">Architecture</p>
-    <h2>Public blast radius: three TeXML routes.</h2>
-    <p class="section-lede dim">
-      The temporary public tunnel only reaches <code>voice-server.mjs</code>.
-      Dashboard, MCP, and credentials stay local. Shared case state lives in <code>data/cases.json</code>.
+    <p class="kicker">Product surfaces</p>
+    <h2>One case file. Five ways to inspect it.</h2>
+    <p class="lede">
+      RxRelay is not a transcript viewer. It is a consent-gated coordination ledger with operator tooling,
+      counterpart attestation, and live visibility — all wired to the same proof gate.
     </p>
-    <figure class="shot">
-      <img src="assets/architecture.png" alt="RxRelay detailed architecture diagram" width="1600" height="900" loading="lazy" />
-      <figcaption>Full system topology — edge, voice process, PAVO core, dashboard/MCP, counterparts.</figcaption>
-    </figure>
+
+    <div class="surface-grid">
+      <article class="surface">
+        <h3>Proof board</h3>
+        <p>
+          Operator dashboard at <code>:3000</code>. Pick a case, walk the sandbox coordination path, watch the
+          close gate flip only when evidence exists. PAVO lab exposes demand scores and route decisions per turn.
+        </p>
+      </article>
+      <article class="surface">
+        <h3>Counterpart portal</h3>
+        <p>
+          Magic-link attestations for pharmacy, clinic, or insurer staff. Third parties confirm blockers, PA
+          submission, or readiness — replacing patient-spoken stand-ins with recorded counterpart facts.
+        </p>
+      </article>
+      <article class="surface">
+        <h3>Signed receipts</h3>
+        <p>
+          Hash-chained JSON receipts on case close: consent text, provider action IDs, route decisions, event
+          chain. Pure Node crypto — verifiable without trusting model narration.
+        </p>
+      </article>
+      <article class="surface">
+        <h3>Human ops</h3>
+        <p>
+          Safe-stop and escalation paths set <code>humanReview</code> and block autonomous completion.
+          Urgent medical cues, clinical advice requests, and ambiguous outcomes route to a human owner — not deeper automation.
+        </p>
+      </article>
+      <article class="surface">
+        <h3>Live SSE</h3>
+        <p>
+          Server-sent events stream case mutations to the proof board in real time. Voice turns, webhook events,
+          and coordination actions appear without polling — the operator sees the same state the gate evaluates.
+        </p>
+      </article>
+    </div>
   </div>
 </section>
 
-<section class="band dark" id="demo">
-  <div class="wrap demo-grid">
-    <div>
-      <p class="section-kicker">Run it</p>
-      <h2>Sandbox to live voice in one afternoon.</h2>
+<section class="band" id="architecture">
+  <div class="wrap">
+    <p class="kicker">Architecture</p>
+    <h2>Public blast radius: three TeXML routes.</h2>
+    <p class="lede">
+      Two processes share one case file. The Cloudflare quick tunnel reaches only
+      <code>voice-server.mjs</code> — token-gated TeXML on <code>:3001</code>, no dashboard, no MCP, no
+      outbound credentials in the voice request path. Dashboard, webhook seam, and MCP live on
+      <code>server.mjs</code> at <code>:3000</code>. Shared state persists through
+      <code>data/cases.json</code> via <code>persist.mjs</code>.
+    </p>
+    <figure class="figure">
+      <img src="assets/architecture.png" alt="RxRelay system architecture: edge, voice process, shared core, dashboard, counterparts" width="1600" height="900" loading="lazy" />
+      <figcaption>Voice gateway isolation is deliberate — exposing the tunnel does not expose the full application.</figcaption>
+    </figure>
+
+    <div class="arch-facts">
+      <div>
+        <strong>Sandbox default</strong>
+        <p><code>TELEPHONY_PROVIDER=demo</code> — full E2E proof path with zero runtime dependencies. No real dial or SMS.</p>
+      </div>
+      <div>
+        <strong>Live inbound</strong>
+        <p>Real TeXML speech loop via claimed a1mobile number. Inbound voice ≠ outbound messaging until OTP allowlist + provider action id.</p>
+      </div>
+      <div>
+        <strong>Fail closed</strong>
+        <p>Live adapter refuses completion without provider-issued action id. Failed calls never manufacture action evidence.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band band-deep" id="demo">
+  <div class="wrap demo-layout">
+    <div class="demo-copy">
+      <p class="kicker">Run it</p>
+      <h2>Sandbox today. Live inbound when you are ready.</h2>
+      <p class="lede">
+        Clone, copy <code>.env.example</code>, run tests — no <code>npm install</code>.
+        The sandbox demo walks RX-1048 from consent through pharmacy blocker, clinic submission, and verified close.
+        Live mode is a configuration decision: tunnel, point the number, speak consent — outbound stays gated until you explicitly enable it.
+      </p>
       <pre class="terminal"><code>git clone https://github.com/vnmoorthy/rxrelay.git
 cd rxrelay
 cp .env.example .env
-npm test          # 11 tests, no install
-npm run dev       # proof board :3000
-npm run live:inbound   # TeXML + tunnel + point</code></pre>
-      <p class="demo-note">After consent, say “check my prescription status” — the voice agent can walk the sandbox proof path end to end.</p>
+npm test              # 11 tests · node:test · zero deps
+npm run dev           # proof board → localhost:3000
+npm run live:inbound  # TeXML :3001 → tunnel → point number</code></pre>
+      <p class="demo-hint">
+        After consent on a live call, say <em>“check my prescription status”</em> — the voice agent walks the permitted coordination path and keeps the case open until counterpart evidence lands.
+      </p>
     </div>
-    <div class="demo-links">
+    <aside class="demo-links" aria-label="Resources">
       <a href="https://github.com/vnmoorthy/rxrelay">GitHub repository</a>
       <a href="https://github.com/vnmoorthy/rxrelay/blob/main/deck/output/RxRelay_Hackathon_Pitch.pptx">10-slide pitch deck</a>
       <a href="https://openreview.net/forum?id=zrneoIxlFx">PAVO on OpenReview</a>
+      <a href="https://github.com/vnmoorthy/pavo-bench">PAVO-Bench</a>
       <a href="https://github.com/vnmoorthy/groundtruth">Groundtruth — refuse “done” without evidence</a>
       <a href="https://github.com/vnmoorthy/lifeline">Lifeline — evidence-gated voice safety</a>
-      <a href="https://github.com/vnmoorthy/mcpobservatory">MCP Observatory</a>
+    </aside>
+  </div>
+</section>
+
+<section class="band band-invest" id="invest">
+  <div class="wrap">
+    <p class="kicker">Why a1mobile should invest</p>
+    <h2>Voice infrastructure that closes loops — not just conversations.</h2>
+    <p class="lede">
+      a1mobile’s stack already carries the calls. RxRelay shows what happens when TeXML speech, webhooks, and
+      OTP-gated outreach feed a case engine that refuses to hallucinate completion. The wedge is prescription access —
+      high-frequency, high-anxiety, coordination-heavy — where proof beats polish.
+    </p>
+
+    <div class="invest-grid">
+      <article>
+        <h3>Uses your primitives natively</h3>
+        <p>
+          TeXML <code>&lt;Gather&gt;</code> speech and DTMF, number claim/point scripts, SMS OTP verification,
+          webhook events — not a parallel telephony abstraction. PAVO upgrades map directly onto capture mode changes
+          in the live voice loop.
+        </p>
+      </article>
+      <article>
+        <h3>Defensible differentiation</h3>
+        <p>
+          Every competitor demo ends at “the agent said done.” RxRelay exports hash-chained receipts, counterpart
+          attestations, and a deterministic gate that partners and compliance teams can audit. That is a platform story,
+          not a prompt-engineering story.
+        </p>
+      </article>
+      <article>
+        <h3>Research-backed routing</h3>
+        <p>
+          PAVO is peer-reviewed (TMLR 2026) with an open benchmark. RxRelay is the reference implementation for
+          clinical-ops voice — demand-conditioned, coupling-aware, honest about what upgrades and what does not.
+        </p>
+      </article>
+      <article>
+        <h3>Shippable today</h3>
+        <p>
+          Zero runtime dependencies. CI green. Sandbox E2E proven. Live inbound path exercised. Live outbound fails closed
+          until OTP allowlist and provider action confirmation — the safe default for a Catalyst investment conversation.
+        </p>
+      </article>
+    </div>
+
+    <div class="invest-cta">
+      <a class="btn btn-primary" href="https://github.com/vnmoorthy/rxrelay">Explore the repository</a>
+      <a class="btn btn-outline" href="https://github.com/vnmoorthy/rxrelay/blob/main/deck/output/RxRelay_Hackathon_Pitch.pptx">Read the pitch deck</a>
     </div>
   </div>
 </section>
@@ -187,8 +384,12 @@ npm run live:inbound   # TeXML + tunnel + point</code></pre>
 
 <footer class="site-foot">
   <div class="wrap foot-inner">
-    <p>RxRelay · Proof, not promises.</p>
-    <p>MIT · Built for the a1mobile Voice AI Hackathon 2026 · Grounded in <a href="https://openreview.net/forum?id=zrneoIxlFx">PAVO</a></p>
+    <p><strong>RxRelay</strong> · MIT · a1mobile Voice AI Hackathon 2026</p>
+    <p>
+      <a href="https://github.com/vnmoorthy/rxrelay">GitHub</a>
+      · <a href="https://openreview.net/forum?id=zrneoIxlFx">PAVO paper</a>
+      · <a href="https://github.com/vnmoorthy/pavo-bench">PAVO-Bench</a>
+    </p>
   </div>
 </footer>
 </body>

@@ -3,37 +3,58 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="RxRelay — a consent-first voice coordination agent for prescription access." />
-    <title>RxRelay — Proof, not promises</title>
+    <meta name="description" content="RxRelay proof board — consent-first prescription-access coordination." />
+    <title>RxRelay — Proof board</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="aurora aurora-one"></div><div class="aurora aurora-two"></div>
     <main class="shell">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="RxRelay home"><span class="brand-mark">R</span><span>RxRelay</span></a>
-        <div class="mode-pill" id="mode-pill"><span class="pulse"></span> Loading sandbox</div>
-        <a class="docs-link" href="https://github.com/vnmoorthy/rxrelay" target="_blank" rel="noreferrer">Read the protocol ↗</a>
+        <a class="brand" href="/" aria-label="RxRelay home"><span class="brand-mark">Rx</span><span>RxRelay</span></a>
+        <div class="mode-pill" id="mode-pill"><span class="pulse"></span> Loading</div>
+        <div class="live-pill" id="live-pill">SSE · connecting</div>
+        <a class="docs-link" href="https://github.com/vnmoorthy/rxrelay" target="_blank" rel="noreferrer">Protocol ↗</a>
       </header>
 
       <section class="hero">
         <div>
-          <p class="eyebrow">Voice coordination for prescription access</p>
+          <p class="eyebrow">Live proof board</p>
           <h1>Make the calls.<br /><em>Bring the proof.</em></h1>
-          <p class="hero-copy">RxRelay turns a consented voice request into a verified coordination case—across patient, pharmacy, and clinic—without pretending that “AI completed” means “the problem is solved.”</p>
+          <p class="hero-copy">Consent-gated coordination across patient, pharmacy, clinic, and insurer — with signed receipts, counterpart attestations, and a human ops queue when automation must stop.</p>
         </div>
         <aside class="safety-card">
           <span class="shield">✦</span>
-          <div><strong>Safety-bounded by design</strong><p>No medical advice. No prescription changes. No unconsented outreach.</p></div>
+          <div><strong>Safety-bounded</strong><p>No medical advice. No Rx changes. No unconsented outreach.</p></div>
         </aside>
+      </section>
+
+      <section class="ops-grid">
+        <form id="create-form" class="create-panel">
+          <p class="eyebrow">Open a case</p>
+          <h3>New coordination case</h3>
+          <label>Patient alias <input name="patientAlias" required placeholder="Taylor R." /></label>
+          <label>Recipient E.164 <input name="recipient" required placeholder="+15550001048" /></label>
+          <label>Medication (minimum necessary) <input name="medication" placeholder="Demo medication" /></label>
+          <button type="submit">Create case</button>
+        </form>
+        <section class="queue-panel">
+          <p class="eyebrow">Human ops</p>
+          <h3>Escalation queue</h3>
+          <div id="ops-queue" class="ops-queue"><span class="message-placeholder">No cases in human review.</span></div>
+          <button type="button" id="timeout-scan" class="ghost-btn">Scan for stale cases</button>
+        </section>
       </section>
 
       <section class="case-board" aria-live="polite">
         <div class="case-heading">
           <div>
-            <p class="eyebrow">Live case-resolution proof board</p>
-            <h2 id="case-title">RX-1048 · Demo prescription-access case</h2>
-            <label class="case-picker-label" for="case-picker">Active case</label>
+            <p class="eyebrow">Active case</p>
+            <h2 id="case-title">—</h2>
+            <label class="case-picker-label" for="case-picker">Select case</label>
             <select id="case-picker" class="case-picker" aria-label="Select case"></select>
           </div>
           <div class="status-wrap"><span class="status" id="case-status">Loading</span><span class="subtitle" id="case-created"></span></div>
@@ -56,22 +77,24 @@
             <p class="proof-intro">A case cannot turn green until every evidence condition is true.</p>
             <ul class="proof-list" id="proof-list"></ul>
             <div class="proof-footer" id="proof-footer">No completion claim yet.</div>
+            <button type="button" id="export-receipt" class="ghost-btn" disabled>Export signed receipt</button>
           </aside>
         </div>
 
         <div class="actions-panel">
-          <div class="actions-title"><p class="eyebrow">End-to-end sandbox scenario</p><h3>Run the live demo</h3><p>Every button executes a real state transition. This build never calls or texts a real person in sandbox mode.</p></div>
+          <div class="actions-title"><p class="eyebrow">Sandbox + ops</p><h3>Drive the case</h3><p>Sandbox never contacts real people. Counterpart links create third-party attestation URLs.</p></div>
           <div class="actions" id="actions"></div>
+          <div class="link-row" id="link-row"></div>
         </div>
 
         <div class="bottom-grid">
           <section class="timeline-panel"><div class="section-title"><p class="eyebrow">Evidence timeline</p><h3>What actually happened</h3></div><ol class="timeline" id="timeline"></ol></section>
-          <section class="message-panel"><div class="section-title"><p class="eyebrow">Patient communication</p><h3>SMS preview</h3></div><div id="message-preview" class="message-preview"><span class="message-placeholder">No patient update has been sent.</span></div><p class="message-note">Messages are consent-gated and tagged with their delivery mode.</p></section>
+          <section class="message-panel"><div class="section-title"><p class="eyebrow">Patient communication</p><h3>SMS preview</h3></div><div id="message-preview" class="message-preview"><span class="message-placeholder">No patient update has been sent.</span></div><p class="message-note">Messages are consent-gated and tagged with delivery mode.</p></section>
         </div>
       </section>
 
       <section class="voice-lab">
-        <div><p class="eyebrow">Try the PAVO route</p><h2>What happens when the call gets uncertain?</h2><p>Paste a simulated utterance. RxRelay upgrades the full voice pipeline when critical details are unclear, and stops safely for requests it must not automate.</p></div>
+        <div><p class="eyebrow">PAVO lab</p><h2>What happens when the call gets uncertain?</h2><p>Paste a simulated utterance. Verified turns upgrade capture (speech + DTMF) and reasoning together.</p></div>
         <form id="voice-form" class="voice-form">
           <label for="utterance">Simulated inbound voice turn</label>
           <textarea id="utterance" rows="3">The pharmacy said I need prior authorization, but I couldn't hear the reference number.</textarea>

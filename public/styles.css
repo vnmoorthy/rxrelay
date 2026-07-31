@@ -3,3 +3,27 @@
 @media (max-width:1000px){.hero{grid-template-columns:1fr;gap:22px}.board-grid,.bottom-grid,.voice-lab{grid-template-columns:1fr}.actions-panel{grid-template-columns:1fr}.actions{grid-template-columns:repeat(3,1fr)}.voice-result{grid-column:auto}}
 @media (max-width:700px){.shell{width:min(100% - 24px,1440px)}.topbar .docs-link{display:none}.hero{padding:48px 7px 28px}.case-board{padding:15px}.case-heading{display:block}.status-wrap{text-align:left;margin-top:10px}.pavo-strip{display:block}.pipeline{justify-content:flex-start;margin-top:10px}.lanes{grid-template-columns:1fr}.actions{grid-template-columns:1fr 1fr}.form-row{flex-wrap:wrap}.form-row button{margin-left:0}.hero h1{font-size:52px}}
 .case-picker-label{display:block;margin-top:10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:#748299}.case-picker{margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font:inherit;font-size:13px;min-width:min(100%,320px)}
+
+/* Investment-grade dashboard extensions */
+body{font-family:Sora,ui-sans-serif,system-ui,sans-serif}
+.brand-mark{font-family:Fraunces,Georgia,serif;font-size:12px;letter-spacing:.02em}
+.hero h1 em{font-family:Fraunces,Georgia,serif}
+.live-pill{padding:7px 11px;border:1px solid #cad9e4;background:#eef5fb;color:#33586f;border-radius:999px;font-size:11px;font-weight:700;font-family:"IBM Plex Mono",ui-monospace,monospace}
+.live-pill.on{border-color:#9adfd4;background:#edfffb;color:#14665c}
+.ops-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;margin:0 0 22px}
+.create-panel,.queue-panel{background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow)}
+.create-panel h3,.queue-panel h3{margin:0 0 12px;letter-spacing:-.03em}
+.create-panel label{display:block;margin:0 0 10px;font-size:11px;font-weight:700;color:#5b6c80;text-transform:uppercase;letter-spacing:.08em}
+.create-panel input{display:block;width:100%;margin-top:5px;padding:10px 11px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:13px;text-transform:none;letter-spacing:0;font-weight:500;color:var(--ink)}
+.create-panel button,.ghost-btn{margin-top:6px;padding:10px 12px;border:0;border-radius:10px;background:var(--teal);color:#06251f;font:inherit;font-weight:700;cursor:pointer}
+.ghost-btn{display:inline-block;background:transparent;border:1px solid #b9d0ca;color:#14665c;margin-top:12px}
+.ops-queue{display:flex;flex-direction:column;gap:8px;min-height:84px}
+.queue-item{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:#f7fafb;cursor:pointer;font:inherit;text-align:left}
+.queue-item strong{font-size:12px;color:var(--ink)}
+.queue-item span{font-size:11px;color:var(--muted)}
+.actions{grid-template-columns:repeat(3,1fr)}
+.link-row{grid-column:1 / -1;margin-top:10px}
+.attest-url{display:inline-block;padding:8px 10px;border-radius:8px;background:#eef8f6;color:#0b6f64;font-size:12px;font-family:"IBM Plex Mono",ui-monospace,monospace;word-break:break-all;text-decoration:none}
+#export-receipt{width:100%}
+#export-receipt:disabled{opacity:.4;cursor:not-allowed}
+@media (max-width:1000px){.ops-grid{grid-template-columns:1fr}.topbar{flex-wrap:wrap}}

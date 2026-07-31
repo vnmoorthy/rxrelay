@@ -194,3 +194,85 @@ test("shared JSON persistence keeps voice and dashboard case state aligned", asy
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+import { buildProofReceipt, verifyProofReceipt } from "../src/receipt.mjs";
+import { _resetCounterpartTokens } from "../src/counterpart.mjs";
+import { publishCaseEvent, caseBus } from "../src/bus.mjs";
+
+test("signed proof receipts verify and detect tampering", async () => {
+  const store = new CaseStore({ telephony: new DemoTelephonyAdapter(), seedDemo: false });
+  const opened = store.createCase({ patientAlias: "Pat", recipient: "+15550002222", medication: "Demo" });
+  store.recordConsent(opened.id, { granted: true, statement: "I consent to a pharmacy status follow-up and text updates." });
+  await store.beginCoordination(opened.id);
+  store.recordPharmacyBlocker(opened.id);
+  store.recordClinicSubmission(opened.id);
+  await store.recordPharmacyReady(opened.id);
+  const receipt = store.exportReceipt(opened.id);
+  assert.equal(verifyProofReceipt(receipt).ok, true);
+  const tampered = structuredClone(receipt);
+  tampered.evidence.consentRecorded = false;
+  assert.equal(verifyProofReceipt(tampered).ok, false);
+});
+
+test("counterpart magic links can attest outcomes without patient speech", async () => {
+  _resetCounterpartTokens();
+  const store = new CaseStore({ telephony: new DemoTelephonyAdapter(), seedDemo: false });
+  const opened = store.createCase({ patientAlias: "Pat", recipient: "+15550003333", medication: "Demo" });
+  store.recordConsent(opened.id, { granted: true, statement: "I consent to a pharmacy status follow-up and text updates." });
+  await store.beginCoordination(opened.id);
+  const pharmacy = store.issueCounterpartLink(opened.id, "pharmacy");
+  await store.attestCounterpart(pharmacy.link.token, { outcome: "pharmacy_blocker", note: "PA needed" });
+  const clinic = store.issueCounterpartLink(opened.id, "clinic");
+  await store.attestCounterpart(clinic.link.token, { outcome: "clinic_submission", reference: "PA-77" });
+  const readyLink = store.issueCounterpartLink(opened.id, "pharmacy");
+  const ready = await store.attestCounterpart(readyLink.link.token, { outcome: "pharmacy_ready" });
+  assert.equal(ready.proof.ready, true);
+  assert.equal(ready.events.some((event) => event.data?.attestedBy === "pharmacy"), true);
+});
+
+test("human ops queue supports escalate and resume automation", () => {
+  const store = new CaseStore({ telephony: new DemoTelephonyAdapter(), seedDemo: false });
+  const opened = store.createCase({ patientAlias: "Pat", recipient: "+15550004444", medication: "Demo" });
+  store.recordConsent(opened.id, { granted: true, statement: "I consent to a pharmacy status follow-up and text updates." });
+  store.escalate(opened.id, "Needs pharmacist judgment");
+  assert.equal(store.listHumanQueue().some((item) => item.id === opened.id), true);
+  const resumed = store.resumeAutomation(opened.id);
+  assert.equal(resumed.humanReview, false);
+  assert.equal(store.listHumanQueue().some((item) => item.id === opened.id), false);
+});
+
+test("timeout escalation routes stale coordinating cases to humans", async () => {
+  const store = new CaseStore({ telephony: new DemoTelephonyAdapter(), seedDemo: false });
+  const opened = store.createCase({ patientAlias: "Pat", recipient: "+15550005555", medication: "Demo" });
+  store.recordConsent(opened.id, { granted: true, statement: "I consent to a pharmacy status follow-up and text updates." });
+  await store.beginCoordination(opened.id);
+  store.mutate(() => {
+    const record = store.cases.get(opened.id);
+    record.createdAt = new Date(Date.now() - 1000 * 60 * 60).toISOString();
+    return null;
+  });
+  const escalated = store.markStaleForHumanReview(1000 * 60 * 5);
+  assert.deepEqual(escalated, [opened.id]);
+  assert.equal(store.get(opened.id).humanReview, true);
+});
+
+test("case bus publishes envelopes for live SSE consumers", () => {
+  let seen = null;
+  const onCase = (envelope) => { seen = envelope; };
+  caseBus.on("case", onCase);
+  publishCaseEvent("unit_probe", { caseId: "RX-TEST" });
+  caseBus.off("case", onCase);
+  assert.equal(seen.type, "unit_probe");
+  assert.equal(seen.caseId, "RX-TEST");
+});
+
+test("verified capture mode is exposed on the verified tier label", async () => {
+  const { TIER_LABELS } = await import("../src/pavo.mjs");
+  assert.equal(TIER_LABELS.verified.captureMode, "speech_digits");
+  const route = routeTurn({
+    transcript: "The prior authorization number sounded like PA two zero four eight",
+    asrConfidence: 0.71,
+    noiseLevel: 0.55,
+  });
+  assert.equal(route.tier, "verified");
+});

@@ -2,6 +2,9 @@ import crypto from "node:crypto";
 import { routeTurn, TIER_LABELS, detectVoiceIntent } from "./pavo.mjs";
 import { PavoInferenceEngine } from "./inference.mjs";
 import { JsonCasePersistence } from "./persist.mjs";
+import { publishCaseEvent } from "./bus.mjs";
+import { buildProofReceipt } from "./receipt.mjs";
+import { issueCounterpartToken, consumeCounterpartToken, listOpenTokensForCase } from "./counterpart.mjs";
 
 const now = () => new Date().toISOString();
 const clone = (value) => structuredClone(value);
@@ -123,18 +126,110 @@ export class CaseStore {
         clinic: { submissionRecorded: false },
         communications: [],
         events: [],
+        counterpartLinks: [],
+        insurer: null,
+        receiptTip: null,
       };
       this.cases.set(caseId, record);
       this.addEvent(record, "case_created", "Case created with minimum necessary details.", "system", { source, pavoTier: routed.tier });
       if (routed.tier === "safe_stop") {
         this.addEvent(record, "safety_stop", routed.reason, "system", { route: routed });
       }
+      publishCaseEvent("case_created", { caseId });
       return clone(record);
     });
   }
 
   addEvent(record, type, summary, lane, data = {}) {
     record.events.unshift({ id: crypto.randomUUID(), type, summary, lane, data, createdAt: now() });
+    publishCaseEvent("case_event", { caseId: record.id, type, summary, lane, status: deriveStatus(record).key });
+  }
+
+  listHumanQueue() {
+    return this.list().filter((item) => item.humanReview && item.status.key !== "resolved");
+  }
+
+  resumeAutomation(id, reason = "Human cleared the case for automation") {
+    return this.mutate(() => {
+      const record = this.cases.get(id);
+      if (!record) throw new Error(`Case ${id} was not found.`);
+      record.humanReview = false;
+      this.addEvent(record, "automation_resumed", reason, "system");
+      return this.getUnlocked(id);
+    });
+  }
+
+  issueCounterpartLink(id, role = "pharmacy") {
+    return this.mutate(() => {
+      const record = this.cases.get(id);
+      if (!record) throw new Error(`Case ${id} was not found.`);
+      this.requireConsent(record);
+      if (!["pharmacy", "clinic", "insurer"].includes(role)) throw new Error("Counterpart role must be pharmacy, clinic, or insurer.");
+      const issued = issueCounterpartToken({ caseId: id, role });
+      if (!record.counterpartLinks) record.counterpartLinks = [];
+      record.counterpartLinks.unshift(issued);
+      this.addEvent(record, "counterpart_link_issued", `${role} attestation link issued.`, role === "insurer" ? "clinic" : role, { token: issued.token, role });
+      return { case: this.getUnlocked(id), link: issued };
+    });
+  }
+
+  attestCounterpart(token, { outcome, note = "", reference = "" } = {}) {
+    return this.mutateAsync(async () => {
+      const link = consumeCounterpartToken(token);
+      if (!link || link.status !== "consumed") throw new Error(link?.status === "used" ? "This attestation link was already used." : "Attestation link is invalid or expired.");
+      const record = this.cases.get(link.caseId);
+      if (!record) throw new Error(`Case ${link.caseId} was not found.`);
+      this.requireConsent(record);
+      if (outcome === "pharmacy_blocker" || (link.role === "pharmacy" && outcome === "blocker")) {
+        return this.recordPharmacyBlockerUnlocked(link.caseId, { blocker: note || "Prior authorization needed", attestedBy: link.role, token });
+      }
+      if (outcome === "clinic_submission" || (link.role === "clinic" && outcome === "submitted")) {
+        return this.recordClinicSubmissionUnlocked(link.caseId, { reference: reference || "PA-ATTST", attestedBy: link.role, token });
+      }
+      if (outcome === "pharmacy_ready" || (link.role === "pharmacy" && outcome === "ready")) {
+        return this.recordPharmacyReadyUnlocked(link.caseId, { attestedBy: link.role, token });
+      }
+      if (outcome === "insurer_update" || link.role === "insurer") {
+        record.insurer = { ...(record.insurer || {}), lastNote: note || "Coverage status reviewed", updatedAt: now() };
+        record.evidence.counterpartOutcomeRecorded = true;
+        this.addEvent(record, "insurer_update", note || "Insurer counterpart recorded a coverage-status note.", "clinic", { attestedBy: "insurer", token });
+        return this.getUnlocked(link.caseId);
+      }
+      throw new Error("Unknown counterpart outcome.");
+    });
+  }
+
+  exportReceipt(id) {
+    const caseRecord = this.get(id);
+    if (!caseRecord.proof.ready) throw new Error("Proof receipt is only available after the resolution gate is complete.");
+    const receipt = buildProofReceipt(caseRecord);
+    this.mutate(() => {
+      const record = this.cases.get(id);
+      record.receiptTip = receipt.tip;
+      this.addEvent(record, "proof_receipt_exported", `Signed proof receipt exported (${receipt.tip.slice(0, 12)}…).`, "system", { tip: receipt.tip });
+      return null;
+    });
+    return receipt;
+  }
+
+  markStaleForHumanReview(maxAgeMs = 1000 * 60 * 30) {
+    return this.mutate(() => {
+      const stale = [];
+      for (const record of this.cases.values()) {
+        if (record.humanReview || resolutionProof(record).ready) continue;
+        const age = Date.now() - Date.parse(record.createdAt);
+        if (age >= maxAgeMs && record.coordinationStarted) {
+          record.humanReview = true;
+          this.addEvent(record, "timeout_escalation", `Case exceeded ${Math.round(maxAgeMs / 60000)} minutes without resolution; routed to human review.`, "system");
+          stale.push(record.id);
+        }
+      }
+      return stale;
+    });
+  }
+
+  openTokens(id) {
+    return listOpenTokensForCase(id);
   }
 
   get(id) {
@@ -180,11 +275,15 @@ export class CaseStore {
         clinic: { submissionRecorded: false },
         communications: [],
         events: [],
+        counterpartLinks: [],
+        insurer: null,
+        receiptTip: null,
       };
       this.cases.set(caseId, record);
       this.addEvent(record, "case_created", "Case created with minimum necessary details.", "system", { source: "voice", pavoTier: routed.tier });
       if (callId) this.callSessions.set(callId, caseId);
       this.addEvent(record, "voice_call_started", "Inbound voice session opened. No outreach is permitted until explicit consent is recorded.", "patient", { callId: callId || null });
+      publishCaseEvent("voice_opened", { caseId });
       return this.getUnlocked(caseId);
     });
   }
@@ -292,14 +391,14 @@ export class CaseStore {
     return this.mutate(() => this.recordPharmacyBlockerUnlocked(id, { blocker }));
   }
 
-  recordPharmacyBlockerUnlocked(id, { blocker = "Prior authorization needed" } = {}) {
+  recordPharmacyBlockerUnlocked(id, { blocker = "Prior authorization needed", attestedBy = "voice_or_dashboard", token = null } = {}) {
     const record = this.cases.get(id);
     if (!record) throw new Error(`Case ${id} was not found.`);
     this.requireConsent(record);
     record.pharmacy.blocker = blocker;
     record.pharmacy.readyForPickup = false;
     record.evidence.counterpartOutcomeRecorded = true;
-    this.addEvent(record, "pharmacy_blocker", `Pharmacy outcome recorded: ${blocker}.`, "pharmacy");
+    this.addEvent(record, "pharmacy_blocker", `Pharmacy outcome recorded: ${blocker}.`, "pharmacy", { attestedBy, token });
     return this.getUnlocked(id);
   }
 
@@ -307,13 +406,13 @@ export class CaseStore {
     return this.mutate(() => this.recordClinicSubmissionUnlocked(id, { reference }));
   }
 
-  recordClinicSubmissionUnlocked(id, { reference = "PA-2048" } = {}) {
+  recordClinicSubmissionUnlocked(id, { reference = "PA-2048", attestedBy = "voice_or_dashboard", token = null } = {}) {
     const record = this.cases.get(id);
     if (!record) throw new Error(`Case ${id} was not found.`);
     this.requireConsent(record);
     if (!record.pharmacy.blocker) throw new Error("Record a pharmacy blocker before recording a clinic submission.");
     record.clinic.submissionRecorded = true;
-    this.addEvent(record, "clinic_submission", `Clinic outcome recorded: prior authorization submitted (${reference}).`, "clinic", { reference });
+    this.addEvent(record, "clinic_submission", `Clinic outcome recorded: prior authorization submitted (${reference}).`, "clinic", { reference, attestedBy, token });
     return this.getUnlocked(id);
   }
 
@@ -321,14 +420,14 @@ export class CaseStore {
     return this.mutateAsync(async () => this.recordPharmacyReadyUnlocked(id));
   }
 
-  async recordPharmacyReadyUnlocked(id) {
+  async recordPharmacyReadyUnlocked(id, { attestedBy = "voice_or_dashboard", token = null } = {}) {
     const record = this.cases.get(id);
     if (!record) throw new Error(`Case ${id} was not found.`);
     this.requireConsent(record);
     if (!record.clinic.submissionRecorded) throw new Error("Record the clinic follow-up before confirming pharmacy readiness.");
     record.pharmacy.readyForPickup = true;
     record.evidence.counterpartOutcomeRecorded = true;
-    this.addEvent(record, "pharmacy_ready", "Pharmacy confirmed the prescription is ready for pickup.", "pharmacy");
+    this.addEvent(record, "pharmacy_ready", "Pharmacy confirmed the prescription is ready for pickup.", "pharmacy", { attestedBy, token });
     return this.sendPatientUpdateUnlocked(id, "Your pharmacy confirmed your prescription is ready for pickup. Please contact the pharmacy directly for pickup details.", "resolution_update");
   }
 

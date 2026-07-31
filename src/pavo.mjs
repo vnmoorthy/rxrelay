@@ -87,27 +87,30 @@ export function computeDemand({
 export const TIER_LABELS = {
   fast: {
     label: "Fast intake",
-    pipeline: "Edge-fast ASR → compact reasoning → voice",
+    pipeline: "Low-latency speech gather → compact reasoning → voice",
     asrTier: "edge_fast",
     reasoningTier: "compact",
     modelClass: "low-latency",
     paperRoute: "ondevice_fast",
+    captureMode: "speech",
   },
   balanced: {
     label: "Balanced coordination",
-    pipeline: "Hybrid ASR → tool-aware reasoning → voice",
+    pipeline: "Speech gather → tool-aware reasoning → voice",
     asrTier: "hybrid_balanced",
     reasoningTier: "tool_aware",
     modelClass: "standard",
     paperRoute: "hybrid_balanced",
+    captureMode: "speech",
   },
   verified: {
     label: "Verified coordination",
-    pipeline: "Cloud-premium ASR → strong reasoning → structured verifier",
+    pipeline: "Speech + DTMF confirmation → strong reasoning → structured confirm loop",
     asrTier: "cloud_premium",
     reasoningTier: "strong_verified",
     modelClass: "high-assurance",
     paperRoute: "cloud_premium",
+    captureMode: "speech_digits",
   },
   safe_stop: {
     label: "Safety stop",
@@ -116,6 +119,7 @@ export const TIER_LABELS = {
     reasoningTier: "none",
     modelClass: "guarded",
     paperRoute: "hard_constraint_mask",
+    captureMode: "none",
   },
 };
 
