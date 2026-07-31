@@ -168,7 +168,7 @@ Two processes. One shared case file. The public tunnel only ever touches the TeX
         routing                 + local fallback              live adapter
 ```
 
-Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (topology, sequence, state machine, trust boundaries, failure behavior).
+Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · **full diagram:** [`docs/ARCHITECTURE_DIAGRAM.md`](docs/ARCHITECTURE_DIAGRAM.md) · pitch slide 08 in [`assets/architecture.png`](assets/architecture.png).
 
 ---
 

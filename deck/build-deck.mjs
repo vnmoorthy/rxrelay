@@ -286,40 +286,73 @@ function slide7(presentation) {
   });
 }
 
-function node(slide, x, y, w, h, label, copy, tint = "#FFFFFF", accent = C.ink) {
+function node(slide, x, y, w, h, label, copy, tint = "#FFFFFF", accent = C.ink, bodyColor = C.ink) {
   const shape = card(slide, x, y, w, h, { fill: tint, line: tint, name: label });
   text(slide, label.toUpperCase(), x + 15, y + 14, w - 30, 14, { size: 9, bold: true, color: accent });
-  text(slide, copy, x + 15, y + 42, w - 30, h - 50, { size: 13, bold: true, color: C.ink });
+  text(slide, copy, x + 15, y + 38, w - 30, h - 48, { size: 12, bold: true, color: bodyColor });
   return shape;
 }
 
 function slide8(presentation) {
   addSlide(presentation, (slide) => {
-    slide.background.fill = "#FFFFFF";
-    header(slide, "Architecture", 8);
-    title(slide, "A voice agent with a real trust boundary.", "The big idea: an LLM proposes language. Deterministic policy and evidence decide what may happen.", { size: 45, height: 87 });
-    const patient = node(slide, 48, 334, 150, 95, "Patient", "Phone / text\nconsented only", C.bluePale, C.blue);
-    const ingress = node(slide, 236, 334, 160, 95, "Voice ingress", "a1mobile\nwebhook / MCP", "#F2F5F8", C.muted);
-    const gate = node(slide, 435, 334, 150, 95, "Policy gate", "Consent +\nsafety scope", C.redPale, C.red);
-    const router = node(slide, 626, 315, 185, 132, "PAVO router", "confidence · noise\ncritical entities\naction risk", C.tealPale, C.teal);
-    const caseEngine = node(slide, 852, 315, 170, 132, "Case engine", "minimum facts\nevent timeline\nproof gate", C.purplePale, C.purple);
-    const pharmacy = node(slide, 1062, 273, 170, 78, "Pharmacy", "status outcome", C.amberPale, C.amber);
-    const clinic = node(slide, 1062, 399, 170, 78, "Clinic / insurer", "follow-up outcome", C.bluePale, C.blue);
-    const human = node(slide, 626, 519, 185, 78, "Human review", "urgent / clinical /\ncontradictory", C.redPale, C.red);
-    const update = node(slide, 852, 519, 170, 78, "Patient update", "only after\nverified outcome", C.tealPale, C.teal);
-    const connector = (a, b, from, to, color = C.rule) => slide.shapes.connect(a, b, { kind: "elbow", fromSide: from, toSide: to, line: { style: "solid", fill: color, width: 2 }, head: { type: "arrow", width: "sm", length: "sm" } });
-    connector(patient, ingress, "right", "left", C.blue);
-    connector(ingress, gate, "right", "left", C.muted);
-    connector(gate, router, "right", "left", C.teal);
-    connector(router, caseEngine, "right", "left", C.teal);
-    connector(caseEngine, pharmacy, "right", "left", C.amber);
-    connector(caseEngine, clinic, "right", "left", C.blue);
-    connector(router, human, "bottom", "top", C.red);
-    connector(caseEngine, update, "bottom", "top", C.teal);
-    connector(update, patient, "left", "bottom", C.teal);
-    text(slide, "Every transition is explicit. Every side effect is isolated. Every closure is verified.", 48, 623, 1000, 22, { size: 16, bold: true, color: C.ink });
-    footer(slide, "Provider-specific code lives in one guarded adapter; the safety model is provider-neutral.");
-    note(slide, "This is the technical credibility slide. Walk left to right, then call attention to the red bypass: unsafe language does not touch an action tool. The bottom return path is blocked until the deterministic proof gate is satisfied.");
+    slide.background.fill = "#071829";
+    text(slide, "ARCHITECTURE", 48, 28, 220, 16, { size: 10, bold: true, color: "#7CE7D5" });
+    text(slide, "RXRELAY  /  08", 1012, 28, 220, 16, { size: 10, bold: true, color: "#8BA1B5", align: "right" });
+    text(slide, "A voice agent with a real trust boundary.", 48, 52, 900, 36, { size: 28, bold: true, color: "#FFFFFF" });
+    text(slide, "LLM proposes language. Deterministic policy + evidence decide what may happen. Public tunnel never reaches the dashboard.", 48, 90, 1100, 28, { size: 13, color: "#A8BACB" });
+
+    text(slide, "PUBLIC EDGE", 48, 132, 160, 14, { size: 9, bold: true, color: "#7CE7D5" });
+    text(slide, "VOICE PROCESS", 280, 132, 160, 14, { size: 9, bold: true, color: "#7CE7D5" });
+    text(slide, "SHARED CORE", 520, 132, 160, 14, { size: 9, bold: true, color: "#7CE7D5" });
+    text(slide, "DASHBOARD / MCP", 780, 132, 180, 14, { size: 9, bold: true, color: "#7CE7D5" });
+    text(slide, "COUNTERPARTS", 1040, 132, 160, 14, { size: 9, bold: true, color: "#7CE7D5" });
+
+    const caller = node(slide, 40, 160, 200, 78, "Caller", "OTP-verified phone\nconsented speech", "#12324A", "#7CE7D5", "#EAF7FF");
+    const tunnel = node(slide, 40, 260, 200, 78, "Quick tunnel", "Cloudflare → :3001 only\nnever exposes dashboard", "#12324A", "#7CE7D5", "#EAF7FF");
+    const a1 = node(slide, 40, 360, 200, 78, "a1mobile / Telnyx", "TeXML Gather + SpeechResult\nclaim · point · SMS APIs", "#12324A", "#7CE7D5", "#EAF7FF");
+
+    const voice = node(slide, 270, 160, 210, 110, "voice-server.mjs", "/voice · /voice/turn · /health\ntoken-gated TeXML only", "#0E4A44", "#7CE7D5", "#EAF7FF");
+    const consent = node(slide, 270, 295, 210, 95, "Consent parse", "explicit phrase + scope\nvague “yes” rejected", "#3A1F24", "#F0A0A0", "#FFE8E8");
+    const safe = node(slide, 270, 415, 210, 95, "Safe stop", "clinical / emergency / Rx change\n→ human review, no action", "#3A1F24", "#F0A0A0", "#FFE8E8");
+
+    const pavo = node(slide, 510, 160, 230, 100, "PAVO router", "confidence · noise · entities\nfast / balanced / verified / stop", "#0E4A44", "#7CE7D5", "#EAF7FF");
+    const infer = node(slide, 510, 282, 230, 90, "Inference", "a1 Responses gateway\n+ local safe fallback", "#12324A", "#9FB6C9", "#EAF7FF");
+    const store = node(slide, 510, 392, 230, 118, "CaseStore + proof gate", "consent ∧ action ∧ outcome ∧ update\npersist → data/cases.json", "#1B3A5C", "#7CE7D5", "#EAF7FF");
+
+    const board = node(slide, 770, 160, 230, 95, "Proof board", "lanes · timeline · 4/4 gate\npublic/ on :3000", "#12324A", "#9FB6C9", "#EAF7FF");
+    const mcp = node(slide, 770, 275, 230, 95, "MCP /api", "create · consent · coordinate\noutcome · brief — same gate", "#12324A", "#9FB6C9", "#EAF7FF");
+    const tel = node(slide, 770, 390, 230, 120, "telephony.mjs", "sandbox adapter by default\nlive fails closed without\nOTP allowlist + provider id", "#3A2A12", "#E6A037", "#FFF4E0");
+
+    const pharm = node(slide, 1030, 160, 210, 90, "Pharmacy", "status / blocker / ready\nsandbox or live action", "#3A2A12", "#E6A037", "#FFF4E0");
+    const clinic = node(slide, 1030, 275, 210, 90, "Clinic / insurer", "PA / follow-up recorded\nas counterpart outcome", "#1B3A5C", "#3D8DFF", "#EAF7FF");
+    const sms = node(slide, 1030, 390, 210, 90, "Patient SMS", "only after proof path\nOTP-verified recipient", "#0E4A44", "#7CE7D5", "#EAF7FF");
+    const human = node(slide, 1030, 505, 210, 78, "Human owner", "escalation queue\nambiguous / urgent / clinical", "#3A1F24", "#F0A0A0", "#FFE8E8");
+
+    const connector = (a, b, from, to, color = "#38506A") => slide.shapes.connect(a, b, { kind: "elbow", fromSide: from, toSide: to, line: { style: "solid", fill: color, width: 2 }, head: { type: "arrow", width: "sm", length: "sm" } });
+    connector(caller, tunnel, "bottom", "top", "#7CE7D5");
+    connector(tunnel, voice, "right", "left", "#7CE7D5");
+    connector(a1, tunnel, "top", "bottom", "#5F6D80");
+    connector(voice, consent, "bottom", "top", "#F0A0A0");
+    connector(voice, pavo, "right", "left", "#7CE7D5");
+    connector(consent, safe, "bottom", "top", "#F0A0A0");
+    connector(pavo, infer, "bottom", "top", "#9FB6C9");
+    connector(infer, store, "bottom", "top", "#7CE7D5");
+    connector(store, board, "right", "left", "#9FB6C9");
+    connector(store, mcp, "right", "left", "#9FB6C9");
+    connector(store, tel, "right", "left", "#E6A037");
+    connector(tel, pharm, "right", "left", "#E6A037");
+    connector(tel, clinic, "right", "left", "#3D8DFF");
+    connector(store, sms, "right", "left", "#7CE7D5");
+    connector(safe, human, "right", "left", "#F0A0A0");
+
+    text(slide, "Blast radius of a public URL = three TeXML routes. Proof flags are never set by model text. Live outreach requires OTP allowlist.", 48, 620, 1180, 22, { size: 13, bold: true, color: "#D6E8F5" });
+    text(slide, "github.com/vnmoorthy/rxrelay  ·  docs/ARCHITECTURE.md  ·  PAVO paper openreview.net/forum?id=zrneoIxlFx", 48, 655, 1100, 18, { size: 11, color: "#8BA1B5" });
+    text(slide, "A1MOBILE VOICE AI HACKATHON · 2026", 900, 680, 340, 16, { size: 9, color: "#8BA1B5", align: "right" });
+    note(slide, "This is the wow technical slide. Walk left→right: public edge, isolated voice process, shared core, dashboard/MCP, counterparts. Emphasize the red safe-stop path never touches live outreach, and the amber telephony adapter fails closed.", [
+      "https://github.com/vnmoorthy/rxrelay",
+      "https://openreview.net/forum?id=zrneoIxlFx",
+      "https://github.com/vnmoorthy/pavo-bench"
+    ]);
   });
 }
 
@@ -348,20 +381,29 @@ function slide10(presentation) {
   addSlide(presentation, (slide) => {
     slide.background.fill = "#FFFFFF";
     header(slide, "The ask", 10);
-    text(slide, "A prescription should not\nfail because coordination did.", 48, 116, 815, 150, { size: 54, bold: true, color: C.ink });
-    text(slide, "RxRelay is the voice coordination layer that turns a consented call into a verifiable outcome.", 52, 302, 670, 55, { size: 19, color: C.muted });
-    card(slide, 50, 411, 500, 150, { fill: C.dark, line: C.dark });
-    text(slide, "LIVE DEMO", 77, 439, 120, 17, { size: 10, bold: true, color: "#7CE7D5" });
-    text(slide, "Run the proof board.\nTry the unsafe branch.", 77, 473, 400, 52, { size: 24, bold: true, color: "#FFFFFF" });
-    card(slide, 582, 411, 602, 150, { fill: C.tealPale, line: C.tealPale });
-    text(slide, "WHY THIS WINS", 610, 439, 180, 17, { size: 10, bold: true, color: C.teal });
-    text(slide, "Real problem. Real voice UX.\nReal safety. It actually runs.", 610, 473, 520, 52, { size: 24, bold: true, color: C.ink });
-    text(slide, "github.com/vnmoorthy/rxrelay", 50, 614, 600, 24, { size: 17, bold: true, color: C.blue });
-    text(slide, "PAVO: Pipeline-Aware Voice Orchestration with Demand-Conditioned Inference Routing", 50, 647, 800, 16, { size: 10, color: C.muted });
+    text(slide, "A prescription should not\nfail because coordination did.", 48, 100, 815, 130, { size: 48, bold: true, color: C.ink });
+    text(slide, "RxRelay turns a consented call into a verifiable outcome — grounded in PAVO research and the same evidence discipline as Groundtruth, Lifeline, and MCP Observatory.", 52, 255, 760, 55, { size: 16, color: C.muted });
+    card(slide, 50, 340, 380, 150, { fill: C.dark, line: C.dark });
+    text(slide, "LIVE DEMO", 77, 365, 120, 17, { size: 10, bold: true, color: "#7CE7D5" });
+    text(slide, "Proof board + unsafe branch.\nCall the claimed number.", 77, 400, 320, 55, { size: 22, bold: true, color: "#FFFFFF" });
+    card(slide, 450, 340, 380, 150, { fill: C.tealPale, line: C.tealPale });
+    text(slide, "WHY THIS WINS", 478, 365, 180, 17, { size: 10, bold: true, color: C.teal });
+    text(slide, "Real problem. Real voice UX.\nReal safety. It actually runs.", 478, 400, 320, 55, { size: 22, bold: true, color: C.ink });
+    card(slide, 850, 340, 382, 150, { fill: C.bluePale, line: C.bluePale });
+    text(slide, "TRUSTED LINEAGE", 878, 365, 200, 17, { size: 10, bold: true, color: C.blue });
+    text(slide, "PAVO paper · pavo-bench\nGroundtruth · Lifeline · MCPobs", 878, 400, 320, 55, { size: 18, bold: true, color: C.ink });
+    text(slide, "github.com/vnmoorthy/rxrelay", 50, 530, 500, 24, { size: 18, bold: true, color: C.blue });
+    text(slide, "vnmoorthy.github.io/rxrelay", 50, 560, 500, 22, { size: 16, bold: true, color: C.teal });
+    text(slide, "openreview.net/forum?id=zrneoIxlFx  ·  Pitch: deck/output/RxRelay_Hackathon_Pitch.pptx", 50, 600, 900, 18, { size: 12, color: C.muted });
     footer(slide, "RxRelay · Proof, not promises.");
-    note(slide, "End on the product conviction. Invite the judges to try the live board, then show the safety stop. The repo is deliberately documented like a product, not a hackathon code dump.", [
-      "https://github.com/vnmoorthy/pavo-bench (PAVO reference repository)",
-      "https://github.com/vnmoorthy/lifeline (evidence-gated voice safety patterns)"
+    note(slide, "End on conviction. Invite judges to try the live board and the safety stop. Point to the website and the research lineage so this does not look like a one-weekend toy.", [
+      "https://github.com/vnmoorthy/rxrelay",
+      "https://vnmoorthy.github.io/rxrelay/",
+      "https://openreview.net/forum?id=zrneoIxlFx",
+      "https://github.com/vnmoorthy/pavo-bench",
+      "https://github.com/vnmoorthy/groundtruth",
+      "https://github.com/vnmoorthy/lifeline",
+      "https://github.com/vnmoorthy/mcpobservatory"
     ]);
   });
 }

@@ -15,4 +15,5 @@ deck/*.pptx
 deck/output/*
 !deck/output/RxRelay_Hackathon_Pitch.pptx
 !deck/output/slide-06.png
+!deck/output/slide-08.png
 !deck/output/deck-montage.webp
