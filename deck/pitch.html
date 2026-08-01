@@ -6,24 +6,23 @@
   <title>RxRelay — Pitch Deck</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@500&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="pitch.css" />
 </head>
 <body>
   <div class="deck" id="deck">
 
     <!-- 01 Title -->
-    <section class="slide is-active" data-notes="Open with the outcome, not 'an AI agent.' Say what becomes possible for someone stranded between systems: one consented request, followed until evidence exists. Pause on 'Proof, not promises' — that's the product ethic.">
+    <section class="slide slide--title is-active" data-notes="Open on the outcome, not 'an AI agent.' One consented request, followed until evidence exists. Pause on Proof, not promises. Mention Maya only as the voice — the product is the proof gate.">
       <header class="slide-head">
         <p class="kicker">a1mobile Voice AI Hackathon 2026</p>
         <p class="slide-num">01 / 13</p>
       </header>
       <div class="rule"></div>
-      <div class="slide-body">
-        <p class="hero-tag">Voice coordination for prescription access</p>
-        <h1 class="hero-title">RxRelay</h1>
-        <h1><em>Proof, not promises.</em></h1>
-        <p class="lede">A consent-first voice coordinator that follows pharmacy, clinic, and insurer handoffs — and refuses to call a case resolved without evidence.</p>
+      <div class="slide-body slide-body--center">
+        <p class="hero-brand"><span class="brand-mark" aria-hidden="true">Rx</span> RxRelay</p>
+        <h1 class="hero-title">Proof, not promises.</h1>
+        <p class="lede lede--wide">Maya is a consent-first voice coordinator for prescription access — she follows pharmacy, clinic, and insurer handoffs, and refuses to call a case resolved without evidence.</p>
         <div class="pill-row">
           <span class="pill">PAVO routing</span>
           <span class="pill">Evidence-gated</span>
@@ -37,9 +36,9 @@
     </section>
 
     <!-- 02 Problem -->
-    <section class="slide slide--light" data-notes="Use community voices carefully — these are not prevalence statistics. They make the operational burden concrete: people describe calling 10, even 20 pharmacies — not because they wanted an agent, but because coordination had failed.">
+    <section class="slide slide--light" data-notes="Make the operational burden concrete: people call 10–20 pharmacies because coordination failed. The patient is unpaid infrastructure between three institutions that do not share state.">
       <header class="slide-head">
-        <p class="kicker">The human cost</p>
+        <p class="kicker">Problem</p>
         <p class="slide-num">02 / 13</p>
       </header>
       <div class="rule"></div>
@@ -51,18 +50,18 @@
             <div class="node-label">Pharmacy</div>
             <div class="node-copy">“We need a prior authorization.”</div>
           </div>
-          <span class="arrow">→</span>
+          <span class="arrow" aria-hidden="true">→</span>
           <div class="node">
             <div class="node-label">Clinic</div>
             <div class="node-copy">“We sent it — call your insurer.”</div>
           </div>
-          <span class="arrow">→</span>
+          <span class="arrow" aria-hidden="true">→</span>
           <div class="node">
             <div class="node-label">Insurer</div>
             <div class="node-copy">“Ask the pharmacy for the status.”</div>
           </div>
           <div class="patient-badge">
-            <div class="node-label">The patient</div>
+            <div class="node-label">Patient</div>
             <div class="q">?</div>
             <div class="node-copy">calling again</div>
           </div>
@@ -74,109 +73,145 @@
       </footer>
     </section>
 
-    <!-- 03 Insight -->
-    <section class="slide" data-notes="Land the insight: a smoother bot is not the answer. LLMs narrate completion; access problems need evidence. The solution is operational memory plus an honest completion gate — not another conversational wrapper.">
+    <!-- 03 Stakes -->
+    <section class="slide" data-notes="Land the stakes: a smoother bot is not the answer. In medication access, narration that looks like completion is the whole risk. Clinics burn staff on the same loops.">
       <header class="slide-head">
-        <p class="kicker">The missing layer</p>
+        <p class="kicker">Stakes</p>
         <p class="slide-num">03 / 13</p>
       </header>
       <div class="rule"></div>
       <div class="slide-body">
         <h2>LLMs narrate completion.<br />Access problems need <em>evidence</em>.</h2>
-        <div class="grid-2">
-          <div class="card card--warn">
-            <h3>Today</h3>
-            <strong>Call → hold → repeat → hope</strong>
-            <p>No shared state. No reliable owner. No proof the next actor actually acted.</p>
+        <div class="stakes-row">
+          <div class="stake stake--bad">
+            <p class="stake-label">Generic voice agent</p>
+            <p class="stake-line">Conversation ends ⇒ “done”</p>
+            <p class="stake-copy">No shared case. No counterpart proof. Failed calls still sound successful.</p>
           </div>
-          <div class="card card--accent">
-            <h3>With RxRelay</h3>
-            <strong>Consent → coordinate → verify</strong>
-            <p>One case owns the handoffs. The patient sees evidence, not a vague assurance.</p>
+          <div class="stake stake--good">
+            <p class="stake-label">What access requires</p>
+            <p class="stake-line">Consent → coordinate → verify</p>
+            <p class="stake-copy">One owner. Recorded outcomes. Patient update only after the trail is real.</p>
           </div>
         </div>
       </div>
       <footer class="slide-foot">
-        <p class="foot-msg">From conversational agent to accountable coordination system.</p>
+        <p class="foot-msg">In medication access, a polite hallucination is still a failure.</p>
         <p class="foot-brand">RxRelay / 03</p>
       </footer>
     </section>
 
-    <!-- 04 Product -->
-    <section class="slide slide--light" data-notes="Walk the three verbs slowly — intentionally not five product features. The distinctive thing is the proof condition in step three. Emphasize narrow, non-clinical coordination authority.">
+    <!-- 04 Solution -->
+    <section class="slide slide--light" data-notes="Three verbs only. Distinctive thing is the proof condition. Maya sounds human on the phone — short turns, no menus — but authority stays narrow and non-clinical.">
       <header class="slide-head">
-        <p class="kicker">The product</p>
+        <p class="kicker">Solution</p>
         <p class="slide-num">04 / 13</p>
       </header>
       <div class="rule"></div>
       <div class="slide-body">
-        <h2>A consent-first voice coordinator.</h2>
-        <p class="lede">One consented voice request becomes a case with an owner — coordinating status, not medicine.</p>
-        <div class="grid-3">
-          <div class="card">
-            <h3>01 · Ask once</h3>
-            <p>Patient speaks naturally. RxRelay captures narrow, explicit coordination consent.</p>
+        <h2>Maya coordinates status — not medicine.</h2>
+        <p class="lede">One consented voice request becomes a case with an owner. She follows the handoffs until the evidence exists.</p>
+        <div class="verb-row">
+          <div class="verb">
+            <span class="verb-num">01</span>
+            <h3>Ask once</h3>
+            <p>Natural speech. Narrow coordination consent — including “help me with my prescription.”</p>
           </div>
-          <div class="card">
-            <h3>02 · Coordinate</h3>
-            <p>Policy gate permits only non-clinical status follow-up with pharmacy or clinic.</p>
+          <div class="verb">
+            <span class="verb-num">02</span>
+            <h3>Coordinate</h3>
+            <p>Policy permits only non-clinical status follow-up with pharmacy or clinic.</p>
           </div>
-          <div class="card card--accent">
-            <h3>03 · Prove</h3>
+          <div class="verb verb--accent">
+            <span class="verb-num">03</span>
+            <h3>Prove</h3>
             <p>Case stays open until counterpart outcome and consented patient update are recorded.</p>
           </div>
         </div>
       </div>
       <footer class="slide-foot">
-        <p class="foot-msg">The voice layer earns trust by visibly narrowing its authority.</p>
+        <p class="foot-msg">Trust comes from narrowing authority — then proving the work.</p>
         <p class="foot-brand">RxRelay / 04</p>
       </footer>
     </section>
 
     <!-- 05 Proof gate -->
-    <section class="slide" data-notes="Every green check is a deterministic state transition, not an LLM confidence score. Run the dashboard as you narrate — the proof board is the payoff. Take the unsafe voice path and show it stays out of the green state.">
+    <section class="slide" data-notes="Every green check is a deterministic state transition, not an LLM confidence score. Run the dashboard as you narrate. Show the unsafe path stays out of green.">
       <header class="slide-head">
-        <p class="kicker">Resolution gate</p>
+        <p class="kicker">Proof gate</p>
         <p class="slide-num">05 / 13</p>
       </header>
       <div class="rule"></div>
       <div class="slide-body">
-        <h2>A case turns green only when all four proofs arrive.</h2>
-        <p class="lede">Deterministic close gate — activity is not resolution.</p>
-        <div class="proof-eq">
+        <h2>Green only when all four proofs arrive.</h2>
+        <p class="lede">Activity is not resolution. An LLM never decides the case is closed.</p>
+        <div class="proof-eq" aria-label="Resolution proof">
           <span>consent</span><span class="op">∧</span>
           <span>permitted action</span><span class="op">∧</span>
           <span>counterpart outcome</span><span class="op">∧</span>
           <span>patient update</span>
         </div>
         <div class="timeline">
-          <div class="step"><div class="dot"></div><div class="time">00:00</div><div class="label">Consent</div><div class="desc">Explicit coordination scope recorded</div></div>
-          <div class="step"><div class="dot"></div><div class="time">00:20</div><div class="label">Pharmacy</div><div class="desc">Blocker: prior auth needed</div></div>
+          <div class="step"><div class="dot"></div><div class="time">00:00</div><div class="label">Consent</div><div class="desc">Scoped yes on the record</div></div>
+          <div class="step"><div class="dot"></div><div class="time">00:20</div><div class="label">Pharmacy</div><div class="desc">Blocker: prior auth</div></div>
           <div class="step"><div class="dot"></div><div class="time">00:45</div><div class="label">Clinic</div><div class="desc">Follow-up submitted</div></div>
-          <div class="step"><div class="dot"></div><div class="time">01:10</div><div class="label">Verify</div><div class="desc">Pharmacy confirms readiness</div></div>
-          <div class="step"><div class="dot"></div><div class="time">01:22</div><div class="label">Update</div><div class="desc">Consented patient SMS sent</div></div>
+          <div class="step"><div class="dot"></div><div class="time">01:10</div><div class="label">Verify</div><div class="desc">Ready for pickup</div></div>
+          <div class="step"><div class="dot"></div><div class="time">01:22</div><div class="label">Update</div><div class="desc">Consented SMS sent</div></div>
         </div>
       </div>
       <footer class="slide-foot">
-        <p class="foot-msg">No evidence missing. Case can turn green.</p>
+        <p class="foot-msg">No evidence missing → case can turn green.</p>
         <p class="foot-brand">RxRelay / 05</p>
       </footer>
     </section>
 
-    <!-- 06 PAVO -->
-    <section class="slide" data-notes="Explain PAVO plainly: we don't route an uncertain turn to a bigger model alone — we select a safer end-to-end pipeline. Be honest: on verified tiers we use TeXML speech + DTMF and a strong model, not magic multi-vendor ASR. The coupling cliff is real — joint capture and reasoning matter.">
+    <!-- 06 Demo -->
+    <section class="slide slide--light" data-notes="Offer live path: reset sandbox, walk 4/4 gate, call the claimed number. Safe branch greens; unsafe branch stays human-queued. Every button hits real state.">
       <header class="slide-head">
-        <p class="kicker">PAVO routing</p>
+        <p class="kicker">Demo</p>
         <p class="slide-num">06 / 13</p>
       </header>
       <div class="rule"></div>
       <div class="slide-body">
-        <h2>The coupling cliff: joint ASR, capture, and reasoning.</h2>
-        <p class="lede">A stronger LLM cannot repair a misheard authorization number. Upgrade the whole pipeline when audio gets risky.</p>
+        <h2>Sandbox E2E. Live inbound when ready.</h2>
+        <div class="demo-split">
+          <div class="demo-panel">
+            <p class="demo-kicker">Proof board · :3000</p>
+            <p class="demo-cmd">npm run dev</p>
+            <p>Walk consent → pharmacy blocker → clinic → ready → SMS. Watch the 4/4 gate and live SSE.</p>
+          </div>
+          <div class="demo-panel demo-panel--accent">
+            <p class="demo-kicker">Maya · TeXML · :3001</p>
+            <p class="demo-cmd">npm run voice</p>
+            <p>Tunnel, point the number, speak naturally. Consent → PAVO tier → case transitions on the same gate.</p>
+          </div>
+        </div>
+        <div class="pill-row">
+          <span class="pill">Safe branch → green</span>
+          <span class="pill">Unsafe → human queue</span>
+          <span class="pill">Call the claimed number</span>
+        </div>
+      </div>
+      <footer class="slide-foot">
+        <p class="foot-msg">Judged flow is deterministic, visible, and fail-closed.</p>
+        <p class="foot-brand">RxRelay / 06</p>
+      </footer>
+    </section>
+
+    <!-- 07 PAVO -->
+    <section class="slide" data-notes="Be honest: verified tier uses TeXML speech + DTMF and a stronger model — not multi-vendor ASR theater. Coupling cliff is empirical from the PAVO paper.">
+      <header class="slide-head">
+        <p class="kicker">PAVO</p>
+        <p class="slide-num">07 / 13</p>
+      </header>
+      <div class="rule"></div>
+      <div class="slide-body">
+        <h2>Upgrade the pipeline — not just the model.</h2>
+        <p class="lede">A stronger LLM cannot repair a misheard authorization number. When audio gets risky, upgrade capture and reasoning together.</p>
         <div class="tier-grid">
           <div class="tier tier-fast">
             <div class="tier-kicker">Fast</div>
-            <div class="tier-title">Greetings / yes-no</div>
+            <div class="tier-title">Greetings · yes / no</div>
             <div class="tier-pipe">Compact reasoning on clean turns</div>
           </div>
           <div class="tier tier-balanced">
@@ -186,241 +221,199 @@
           </div>
           <div class="tier tier-verified">
             <div class="tier-kicker">Verified</div>
-            <div class="tier-title">Names · dates · prior auth · noise</div>
-            <div class="tier-pipe">TeXML speech + DTMF · strong model — not multi-vendor ASR theater</div>
+            <div class="tier-title">Names · dates · prior auth</div>
+            <div class="tier-pipe">Speech + DTMF · strong model</div>
           </div>
           <div class="tier tier-stop">
             <div class="tier-kicker">Safe stop</div>
-            <div class="tier-title">Clinical or unsafe request</div>
-            <div class="tier-pipe">No action → script → human queue</div>
+            <div class="tier-title">Clinical / unsafe</div>
+            <div class="tier-pipe">No action → human queue</div>
           </div>
         </div>
       </div>
       <footer class="slide-foot">
-        <p class="foot-msg">Demand-conditioned routing · confidence · noise · critical entities · action risk</p>
-        <p class="foot-brand">RxRelay / 06</p>
-      </footer>
-    </section>
-
-    <!-- 07 Live surfaces -->
-    <section class="slide slide--light" data-notes="This is the product walkthrough slide. Point judges at each surface: proof board for transparency, counterpart portal for institutional handoffs, signed receipts for audit, human ops queue for escalation, SSE for live demo fidelity.">
-      <header class="slide-head">
-        <p class="kicker">Live surfaces</p>
-        <p class="slide-num">07 / 13</p>
-      </header>
-      <div class="rule"></div>
-      <div class="slide-body">
-        <h2>Every stakeholder sees the same evidence.</h2>
-        <div class="grid-3">
-          <div class="card">
-            <h3>Proof board</h3>
-            <p>Lanes, timeline, 4/4 gate — public demo on :3000</p>
-          </div>
-          <div class="card">
-            <h3>Counterpart portal</h3>
-            <p>Pharmacy / clinic actions recorded as structured outcomes</p>
-          </div>
-          <div class="card">
-            <h3>Signed receipts</h3>
-            <p>Audit trail for consent, action, and notification events</p>
-          </div>
-          <div class="card">
-            <h3>Human ops queue</h3>
-            <p>Escalation for ambiguous, urgent, or clinical requests</p>
-          </div>
-          <div class="card card--accent">
-            <h3>SSE stream</h3>
-            <p>Live case updates — no pre-baked animation</p>
-          </div>
-          <div class="card">
-            <h3>MCP / API</h3>
-            <p>Same proof gate for programmatic case control</p>
-          </div>
-        </div>
-      </div>
-      <footer class="slide-foot">
-        <p class="foot-msg">UI actions hit the real demo state machine.</p>
+        <p class="foot-msg">Demand · confidence · noise · critical entities · action risk</p>
         <p class="foot-brand">RxRelay / 07</p>
       </footer>
     </section>
 
-    <!-- 08 Architecture -->
-    <section class="slide" data-notes="Walk left→right: public edge, isolated voice process, shared core, dashboard/MCP, counterparts. Blast radius of a public URL = three TeXML routes. Proof flags are never set by model text. Live outreach requires OTP allowlist.">
+    <!-- 08 Moat -->
+    <section class="slide slide--light" data-notes="Product position, not disclaimer. Safe stop is success when automation would be wrong. Signed receipts and fail-closed live telephony are the moat — not prompt cleverness.">
       <header class="slide-head">
-        <p class="kicker">Architecture</p>
+        <p class="kicker">Moat</p>
         <p class="slide-num">08 / 13</p>
       </header>
       <div class="rule"></div>
       <div class="slide-body">
-        <h2>Voice-server blast radius. Dashboard stays local.</h2>
-        <p class="lede">LLM proposes language. Deterministic policy + evidence decide what may happen. Public tunnel never reaches the dashboard.</p>
-        <div class="arch-grid">
-          <div>
-            <div class="arch-col-title">Public edge</div>
-            <div class="arch-box"><strong>Caller</strong>OTP-verified · consented speech</div>
-            <div class="arch-box"><strong>Tunnel</strong>Cloudflare → :3001 only</div>
-            <div class="arch-box"><strong>a1mobile / Telnyx</strong>TeXML Gather + SpeechResult</div>
-          </div>
-          <div>
-            <div class="arch-col-title">Voice process</div>
-            <div class="arch-box"><strong>voice-server.mjs</strong>/voice · /voice/turn · token-gated</div>
-            <div class="arch-box arch-box--danger"><strong>Consent parse</strong>Explicit phrase required</div>
-            <div class="arch-box arch-box--danger"><strong>Safe stop</strong>Clinical → human, no action</div>
-          </div>
-          <div>
-            <div class="arch-col-title">Shared core</div>
-            <div class="arch-box"><strong>PAVO router</strong>fast / balanced / verified / stop</div>
-            <div class="arch-box"><strong>Inference</strong>a1 Responses gateway + fallback</div>
-            <div class="arch-box"><strong>CaseStore</strong>consent ∧ action ∧ outcome ∧ update</div>
-          </div>
-          <div>
-            <div class="arch-col-title">Dashboard</div>
-            <div class="arch-box"><strong>Proof board</strong>local :3000 · public/</div>
-            <div class="arch-box"><strong>MCP / API</strong>same deterministic gate</div>
-            <div class="arch-box arch-box--amber"><strong>telephony.mjs</strong>sandbox default · live fails closed</div>
-          </div>
-          <div>
-            <div class="arch-col-title">Counterparts</div>
-            <div class="arch-box arch-box--amber"><strong>Pharmacy</strong>status / blocker / ready</div>
-            <div class="arch-box"><strong>Clinic / insurer</strong>PA / follow-up recorded</div>
-            <div class="arch-box"><strong>Patient SMS</strong>only after proof path</div>
-          </div>
-        </div>
-      </div>
-      <footer class="slide-foot">
-        <p class="foot-msg">Proof flags are never set by model text alone.</p>
-        <p class="foot-brand">RxRelay / 08</p>
-      </footer>
-    </section>
-
-    <!-- 09 Safety -->
-    <section class="slide slide--light" data-notes="Say this unprompted — it's product position, not a disclaimer. The guardrails make the product deployable in a high-stakes setting. A safe stop is a successful outcome when automation would be the wrong thing.">
-      <header class="slide-head">
-        <p class="kicker">Trust by construction</p>
-        <p class="slide-num">09 / 13</p>
-      </header>
-      <div class="rule"></div>
-      <div class="slide-body">
-        <h2>What we refuse.</h2>
-        <p class="lede">Aggressively useful inside a narrow boundary — visibly humble outside it.</p>
-        <div class="grid-2">
-          <div class="card card--accent">
+        <h2>Useful inside the boundary. Humble outside it.</h2>
+        <div class="moat-grid">
+          <div class="moat-col moat-can">
             <h3>Can do</h3>
             <ul class="list-check">
-              <li>Record explicit coordination consent</li>
+              <li>Record scoped coordination consent</li>
               <li>Check non-clinical status</li>
               <li>Document counterpart outcomes</li>
               <li>Send consented patient updates</li>
             </ul>
           </div>
-          <div class="card card--warn">
-            <h3>Will not do</h3>
+          <div class="moat-col moat-wont">
+            <h3>Will not</h3>
             <ul class="list-x">
-              <li>Clinical advice or dosing guidance</li>
+              <li>Clinical advice or dosing</li>
               <li>Change or transfer prescriptions</li>
-              <li>Disclose controlled-medication inventory</li>
+              <li>Disclose controlled inventory</li>
               <li>Contact unconsented recipients</li>
+            </ul>
+          </div>
+          <div class="moat-col moat-proof">
+            <h3>Defensibility</h3>
+            <ul class="list-check">
+              <li>Hash-chained signed receipts</li>
+              <li>Counterpart attestation portal</li>
+              <li>Live outbound fails closed</li>
+              <li>Proof flags never set by model text</li>
             </ul>
           </div>
         </div>
       </div>
       <footer class="slide-foot">
-        <p class="foot-msg">The wow factor is knowing when not to act.</p>
+        <p class="foot-msg">The wow factor is knowing when not to act — and exporting what did.</p>
+        <p class="foot-brand">RxRelay / 08</p>
+      </footer>
+    </section>
+
+    <!-- 09 Architecture -->
+    <section class="slide" data-notes="Walk left→right. Public blast radius = three TeXML routes. Dashboard never on the tunnel. Proof flags never set by model text.">
+      <header class="slide-head">
+        <p class="kicker">Architecture</p>
+        <p class="slide-num">09 / 13</p>
+      </header>
+      <div class="rule"></div>
+      <div class="slide-body">
+        <h2>Voice blast radius. Dashboard stays local.</h2>
+        <p class="lede">LLM proposes language. Deterministic policy + evidence decide what may happen.</p>
+        <div class="arch-strip">
+          <div class="arch-cell">
+            <span class="arch-label">Edge</span>
+            <strong>Caller + TeXML</strong>
+            <span>OTP · Cloudflare → :3001 only</span>
+          </div>
+          <div class="arch-cell arch-cell--hot">
+            <span class="arch-label">Voice</span>
+            <strong>Maya · voice-server</strong>
+            <span>Consent · safe stop · three routes</span>
+          </div>
+          <div class="arch-cell">
+            <span class="arch-label">Core</span>
+            <strong>PAVO + CaseStore</strong>
+            <span>4/4 gate · shared JSON</span>
+          </div>
+          <div class="arch-cell">
+            <span class="arch-label">Ops</span>
+            <strong>Proof board :3000</strong>
+            <span>Portal · receipts · MCP</span>
+          </div>
+          <div class="arch-cell arch-cell--amber">
+            <span class="arch-label">Live</span>
+            <strong>Fail closed</strong>
+            <span>Sandbox default · OTP allowlist</span>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot">
+        <p class="foot-msg">Public tunnel never reaches the dashboard.</p>
         <p class="foot-brand">RxRelay / 09</p>
       </footer>
     </section>
 
-    <!-- 10 Demo path -->
-    <section class="slide" data-notes="Offer the live path: reset sandbox case, walk consent → pharmacy blocker → clinic action → verify → SMS. Call the claimed number for voice. Show unsafe branch stays red. Every button hits real state — no theater.">
+    <!-- 10 Market -->
+    <section class="slide" data-notes="Company wedge, not vanity total. TAM = healthcare AI voice. $93B is the pain pool that justifies budget — not our capture claim. Beachhead = specialty access desks that already buy telephony.">
       <header class="slide-head">
-        <p class="kicker">Demo path</p>
+        <p class="kicker">Market</p>
         <p class="slide-num">10 / 13</p>
       </header>
       <div class="rule"></div>
       <div class="slide-body">
-        <h2>Sandbox E2E + live call flow.</h2>
-        <div class="grid-2">
-          <div class="card">
-            <h3>Dashboard path</h3>
-            <p><strong>npm run dev</strong> → proof board → trigger counterpart actions → watch 4/4 gate → SSE updates in real time.</p>
-          </div>
-          <div class="card card--accent">
-            <h3>Voice path</h3>
-            <p><strong>npm run voice</strong> → tunnel to :3001 → TeXML inbound → consent parse → PAVO tier → case state transitions.</p>
-          </div>
-        </div>
-        <div class="pill-row">
-          <span class="pill">Reset sandbox case</span>
-          <span class="pill">Safe branch → green</span>
-          <span class="pill">Unsafe branch → human queue</span>
-          <span class="pill">Call the claimed number</span>
-        </div>
-      </div>
-      <footer class="slide-foot">
-        <p class="foot-msg">Judged flow is deterministic, visible, and safe end-to-end.</p>
-        <p class="foot-brand">RxRelay / 10</p>
-      </footer>
-    </section>
-
-    <!-- 11 Market -->
-    <section class="slide" data-notes="Frame as a company wedge, not a vanity total. TAM = healthcare AI voice agents (~$0.5–2B in 2025 depending on definition). Pain pool = utilization management / PA navigation (~$93B Health Affairs; CAQH ~$89B admin transactions). SAM = US medication-access coordination voice. SOM = specialty Rx access desks + hubs that already buy telephony. Be explicit: third-party estimates — we are not claiming we capture $93B.">
-      <header class="slide-head">
-        <p class="kicker">Company opportunity</p>
-        <p class="slide-num">11 / 13</p>
-      </header>
-      <div class="rule"></div>
-      <div class="slide-body">
-        <h2>A real company wedge: medication-access coordination.</h2>
-        <p class="lede">Patients already spend unpaid hours as switchboards. Clinics and pharmacies burn staff on status loops. Voice AI is growing fast — the durable business is owning the <em>evidence-gated</em> access workflow.</p>
+        <h2>Own the evidence-gated access workflow.</h2>
         <div class="market-funnel" aria-label="TAM SAM SOM">
           <div class="market-band market-tam">
             <div class="market-tag">TAM</div>
             <div class="market-fig">~$0.5–2.1B</div>
             <div class="market-label">AI voice agents in healthcare (2025)</div>
-            <p class="market-note">Conservative reports: ~$472M–$651M · broader defs: ~$2.1B · CAGRs often 18–38% into the 2030s</p>
+            <p class="market-note">Conservative band ~$472M–$651M · broader defs ~$2.1B · CAGRs often 18–38% into the 2030s</p>
           </div>
           <div class="market-band market-sam">
-            <div class="market-tag">Pain pool → SAM</div>
+            <div class="market-tag">SAM · pain pool</div>
             <div class="market-fig">~$93B</div>
             <div class="market-label">Annual cost of navigating utilization management / PA</div>
-            <p class="market-note">Health Affairs all-party estimate · CAQH: ~$89B on tracked admin transactions · PA among the costliest manual workflows</p>
+            <p class="market-note">Health Affairs all-party · CAQH ~$89B admin transactions · PA among the costliest manual workflows</p>
           </div>
           <div class="market-band market-som">
             <div class="market-tag">SOM · beachhead</div>
             <div class="market-fig">Specialty access</div>
-            <div class="market-label">Sell proof-gated voice into hubs that already buy telephony</div>
-            <p class="market-note">Year-1: specialty pharmacies · patient-support hubs · digital pharmacies · health-system Rx access teams — priced per resolved case / seat</p>
+            <div class="market-label">Hubs that already buy telephony — priced per resolved case</div>
+            <p class="market-note">Year-1: specialty pharmacies · patient-support hubs · digital pharmacies · health-system Rx access teams</p>
           </div>
         </div>
-        <p class="market-sources">Sources: Towards Healthcare / Research Intelo (AI voice healthcare sizing) · Healthcare Foresights (~$2.14B 2025 broader band) · Health Affairs (~$93.3B utilization management) · CAQH Index 2023 (~$89B admin transactions). Directional third-party estimates — not audited financials.</p>
+        <p class="market-sources">Sources: Towards Healthcare / Research Intelo · Healthcare Foresights · Health Affairs · CAQH Index 2023. Directional third-party estimates — not audited financials.</p>
       </div>
       <footer class="slide-foot">
-        <p class="foot-msg">Charge for resolved access cases — not for words spoken.</p>
+        <p class="foot-msg">Sell resolved access cases — not words spoken.</p>
+        <p class="foot-brand">RxRelay / 10</p>
+      </footer>
+    </section>
+
+    <!-- 11 Business -->
+    <section class="slide slide--light" data-notes="Pricing aligns with the proof gate: charge when evidence exists. Wedge into desks that already have call volume and compliance anxiety.">
+      <header class="slide-head">
+        <p class="kicker">Business</p>
+        <p class="slide-num">11 / 13</p>
+      </header>
+      <div class="rule"></div>
+      <div class="slide-body">
+        <h2>Charge for verified outcomes.</h2>
+        <div class="biz-row">
+          <div class="biz-card">
+            <h3>Who buys</h3>
+            <p>Specialty pharmacies, patient hubs, digital pharmacies, health-system Rx access teams.</p>
+          </div>
+          <div class="biz-card biz-card--accent">
+            <h3>How priced</h3>
+            <p>Per resolved case / seat — aligned to the 4/4 gate, not per minute of chat.</p>
+          </div>
+          <div class="biz-card">
+            <h3>Why now</h3>
+            <p>Voice AI is shipping; compliance still needs receipts. Proof-gated coordination is the missing layer.</p>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot">
+        <p class="foot-msg">The product meter matches the product ethic.</p>
         <p class="foot-brand">RxRelay / 11</p>
       </footer>
     </section>
 
     <!-- 12 Why invest -->
-    <section class="slide slide--light" data-notes="Frame Catalyst fit: evidence culture over demo theater, a1 network as load-bearing infrastructure (TeXML, SMS, voice), open research lineage in PAVO. This is not a one-weekend toy — it extends Groundtruth, Lifeline, MCP Observatory discipline.">
+    <section class="slide" data-notes="Catalyst fit: evidence culture, a1 as load-bearing infra, open PAVO research. Completeness is intentional — live outbound fails closed as safety, not a gap.">
       <header class="slide-head">
-        <p class="kicker">Why invest / Catalyst fit</p>
+        <p class="kicker">Why a1mobile / Catalyst</p>
         <p class="slide-num">12 / 13</p>
       </header>
       <div class="rule"></div>
       <div class="slide-body">
-        <h2>Evidence culture. Load-bearing network. Open research.</h2>
-        <div class="grid-3">
-          <div class="card">
-            <h3>Evidence culture</h3>
-            <p>Proof gates, signed receipts, honest completion — same discipline as Groundtruth and MCP Observatory.</p>
+        <h2>Evidence culture. Your network. Open research.</h2>
+        <div class="why-row">
+          <div class="why">
+            <h3>Evidence</h3>
+            <p>Proof gates, signed receipts, honest completion — Groundtruth / Observatory discipline.</p>
           </div>
-          <div class="card card--accent">
+          <div class="why why--accent">
             <h3>a1 network</h3>
-            <p>TeXML voice, OTP SMS, number verify — real telco primitives, not mocked telephony.</p>
+            <p>TeXML voice, OTP SMS, number verify — load-bearing telco primitives, not mocks.</p>
           </div>
-          <div class="card">
-            <h3>Open research · PAVO</h3>
-            <p>Pipeline-aware voice orchestration — paper + pavo-bench benchmark shipped alongside product.</p>
+          <div class="why">
+            <h3>PAVO</h3>
+            <p>Peer-reviewed routing paper + pavo-bench — shipped alongside the product.</p>
           </div>
         </div>
       </div>
@@ -430,25 +423,26 @@
       </footer>
     </section>
 
-    <!-- 13 Ask / close -->
-    <section class="slide" data-notes="End on conviction. Invite judges to the live board and safety stop. Point to GitHub, site, and paper. Next milestones: live OTP SMS verification and production tunnel hardening — the architecture is ready.">
+    <!-- 13 Ask -->
+    <section class="slide slide--title" data-notes="End on conviction. Invite judges to the live board and safety stop. Next: live OTP SMS + production tunnel + specialty access pilots.">
       <header class="slide-head">
         <p class="kicker">Ask</p>
         <p class="slide-num">13 / 13</p>
       </header>
       <div class="rule"></div>
-      <div class="slide-body">
-        <h2>A prescription should not fail because coordination did.</h2>
-        <p class="lede">RxRelay turns a consented call into a verifiable outcome.</p>
+      <div class="slide-body slide-body--center">
+        <h2 class="close-title">A prescription should not fail because coordination did.</h2>
+        <p class="lede lede--wide">RxRelay turns a consented call into a verifiable outcome.</p>
         <div class="close-links">
+          <a href="https://vnmoorthy.github.io/rxrelay/">vnmoorthy.github.io/rxrelay</a>
           <a href="https://github.com/vnmoorthy/rxrelay">github.com/vnmoorthy/rxrelay</a>
-          <span class="mono">openreview.net/forum?id=zrneoIxlFx · PAVO paper</span>
-          <span class="mono">Next: live OTP SMS + production tunnel · company beachhead = specialty access</span>
+          <span class="mono">openreview.net/forum?id=zrneoIxlFx · PAVO</span>
+          <span class="mono">Next: live OTP SMS · production tunnel · specialty access pilots</span>
         </div>
         <div class="pill-row">
           <span class="pill">Try the proof board</span>
-          <span class="pill">Call the demo line</span>
-          <span class="pill">Read the architecture</span>
+          <span class="pill">Call Maya</span>
+          <span class="pill">Read the receipts</span>
         </div>
       </div>
       <footer class="slide-foot">

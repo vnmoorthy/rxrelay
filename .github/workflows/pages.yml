@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "deck/pitch.html"
+      - "deck/pitch.css"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -29,13 +31,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Assemble Pages artifact
+        run: |
+          mkdir -p _site/deck
+          cp -R site/. _site/
+          cp deck/pitch.html deck/pitch.css _site/deck/
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment

@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>RxRelay — proof-gated prescription-access coordination</title>
-<meta name="description" content="RxRelay coordinates prescription-access follow-ups with explicit consent and refuses to close a case until consent, action, counterpart outcome, and patient update are proven on the record." />
+<title>RxRelay — Maya · proof-gated prescription-access coordination</title>
+<meta name="description" content="Maya is RxRelay’s consent-first voice coordinator for prescription access. Cases close only when consent, action, counterpart outcome, and patient update are proven on the record." />
 <meta name="theme-color" content="#020f14" />
 <link rel="canonical" href="https://vnmoorthy.github.io/rxrelay/" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="RxRelay — proof, not promises" />
-<meta property="og:description" content="Consent-first voice coordination for prescription access. PAVO demand routing upgrades TeXML speech capture and reasoning together. Cases close only on evidence." />
+<meta property="og:description" content="Maya coordinates prescription-access follow-ups with explicit consent. PAVO upgrades TeXML speech capture and reasoning together. Cases close only on evidence." />
 <meta property="og:url" content="https://vnmoorthy.github.io/rxrelay/" />
 <meta property="og:image" content="https://vnmoorthy.github.io/rxrelay/assets/social-preview.png" />
 <meta name="twitter:card" content="summary_large_image" />
@@ -36,11 +36,12 @@
 
     <nav class="nav-links" aria-label="Primary">
       <a href="#problem">Problem</a>
-      <a href="#pavo">PAVO</a>
       <a href="#proof">Proof gate</a>
+      <a href="#pavo">PAVO</a>
       <a href="#product">Product</a>
       <a href="#architecture">Architecture</a>
       <a href="#demo">Demo</a>
+      <a href="deck/pitch.html">Deck</a>
       <a href="#invest">Why a1mobile</a>
     </nav>
 
@@ -68,11 +69,11 @@
       <span class="hero-brand-text">RxRelay</span>
     </p>
     <h1>Proof, not promises.</h1>
-    <p class="hero-support">Consent-first voice coordination for prescription access — a case closes only when the evidence exists.</p>
+    <p class="hero-support">Maya is a consent-first voice coordinator for prescription access — a case closes only when the evidence exists.</p>
     <div class="cta-row">
       <a class="btn btn-primary" href="https://github.com/vnmoorthy/rxrelay">View source</a>
+      <a class="btn btn-outline" href="deck/pitch.html">Pitch deck</a>
       <a class="btn btn-outline" href="https://openreview.net/forum?id=zrneoIxlFx">PAVO paper</a>
-      <a class="btn btn-outline" href="https://github.com/vnmoorthy/rxrelay/blob/main/deck/output/RxRelay_Hackathon_Pitch.pptx">Pitch deck</a>
     </div>
   </div>
 </section>
@@ -221,10 +222,11 @@
 <section class="band band-deep" id="product">
   <div class="wrap">
     <p class="kicker">Product surfaces</p>
-    <h2>One case file. Five ways to inspect it.</h2>
+    <h2>One case file. Maya on the phone. Proof everywhere else.</h2>
     <p class="lede">
-      RxRelay is not a transcript viewer. It is a consent-gated coordination ledger with operator tooling,
-      counterpart attestation, and live visibility — all wired to the same proof gate.
+      RxRelay is not a transcript viewer. It is a consent-gated coordination ledger — natural inbound voice,
+      operator tooling, counterpart attestation, and live visibility — all wired to the same proof gate.
+      Live outbound telephony stays intentionally fail-closed until OTP allowlist and provider confirmation.
     </p>
 
     <div class="surface-grid">
@@ -304,25 +306,27 @@
   <div class="wrap demo-layout">
     <div class="demo-copy">
       <p class="kicker">Run it</p>
-      <h2>Sandbox today. Live inbound when you are ready.</h2>
+      <h2>Sandbox today. Call Maya when you are ready.</h2>
       <p class="lede">
         Clone, copy <code>.env.example</code>, run tests — no <code>npm install</code>.
-        The sandbox demo walks RX-1048 from consent through pharmacy blocker, clinic submission, and verified close.
-        Live mode is a configuration decision: tunnel, point the number, speak consent — outbound stays gated until you explicitly enable it.
+        The sandbox walks a case from consent through pharmacy blocker, clinic submission, and verified close.
+        Live inbound is a configuration decision: tunnel, point the number, speak naturally — outbound stays gated until you explicitly enable it.
       </p>
       <pre class="terminal"><code>git clone https://github.com/vnmoorthy/rxrelay.git
 cd rxrelay
 cp .env.example .env
-npm test              # 11 tests · node:test · zero deps
+npm test              # 24 tests · node:test · zero deps
 npm run dev           # proof board → localhost:3000
-npm run live:inbound  # TeXML :3001 → tunnel → point number</code></pre>
+npm run live:inbound  # Maya TeXML :3001 → tunnel → point number</code></pre>
       <p class="demo-hint">
-        After consent on a live call, say <em>“check my prescription status”</em> — the voice agent walks the permitted coordination path and keeps the case open until counterpart evidence lands.
+        On a live call, say something like <em>“I need help with my prescription — the pharmacy says prior auth”</em> —
+        Maya records scoped consent, walks the permitted path, and keeps the case open until counterpart evidence lands.
       </p>
     </div>
     <aside class="demo-links" aria-label="Resources">
       <a href="https://github.com/vnmoorthy/rxrelay">GitHub repository</a>
-      <a href="https://github.com/vnmoorthy/rxrelay/blob/main/deck/output/RxRelay_Hackathon_Pitch.pptx">13-slide pitch deck</a>
+      <a href="deck/pitch.html">13-slide pitch deck (HTML)</a>
+      <a href="https://github.com/vnmoorthy/rxrelay/blob/main/deck/output/RxRelay_Hackathon_Pitch.pptx">Pitch deck (PPTX)</a>
       <a href="https://openreview.net/forum?id=zrneoIxlFx">PAVO on OpenReview</a>
       <a href="https://github.com/vnmoorthy/pavo-bench">PAVO-Bench</a>
       <a href="https://github.com/vnmoorthy/groundtruth">Groundtruth — refuse “done” without evidence</a>
@@ -376,7 +380,7 @@ npm run live:inbound  # TeXML :3001 → tunnel → point number</code></pre>
 
     <div class="invest-cta">
       <a class="btn btn-primary" href="https://github.com/vnmoorthy/rxrelay">Explore the repository</a>
-      <a class="btn btn-outline" href="https://github.com/vnmoorthy/rxrelay/blob/main/deck/output/RxRelay_Hackathon_Pitch.pptx">Read the pitch deck</a>
+      <a class="btn btn-outline" href="deck/pitch.html">Open the pitch deck</a>
     </div>
   </div>
 </section>
@@ -387,6 +391,7 @@ npm run live:inbound  # TeXML :3001 → tunnel → point number</code></pre>
     <p><strong>RxRelay</strong> · MIT · a1mobile Voice AI Hackathon 2026</p>
     <p>
       <a href="https://github.com/vnmoorthy/rxrelay">GitHub</a>
+      · <a href="deck/pitch.html">Pitch deck</a>
       · <a href="https://openreview.net/forum?id=zrneoIxlFx">PAVO paper</a>
       · <a href="https://github.com/vnmoorthy/pavo-bench">PAVO-Bench</a>
     </p>

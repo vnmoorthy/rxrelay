@@ -10,19 +10,19 @@ Consent-first voice coordination for prescription access.
 A case can close only when **consent ∧ action ∧ counterpart outcome ∧ patient update** are on the record — not when an LLM says “done.”
 
 [![Website](https://img.shields.io/badge/🌐_Website-vnmoorthy.github.io%2Frxrelay-0f766e?style=for-the-badge)](https://vnmoorthy.github.io/rxrelay/)
-[![Pitch Deck](https://img.shields.io/badge/📊_Pitch_Deck-13_slides-071829?style=for-the-badge)](deck/output/RxRelay_Hackathon_Pitch.pptx)
+[![Pitch Deck](https://img.shields.io/badge/📊_Pitch_Deck-13_slides-071829?style=for-the-badge)](https://vnmoorthy.github.io/rxrelay/deck/pitch.html)
 [![License: MIT](https://img.shields.io/badge/License-MIT-10a895?style=for-the-badge)](LICENSE)
 [![Node ≥20](https://img.shields.io/badge/Node-%E2%89%A520-43853d?style=for-the-badge&logo=node.js&logoColor=white)](package.json)
 [![Runtime deps](https://img.shields.io/badge/runtime_deps-0-08786b?style=for-the-badge)](package.json)
 
 [![CI](https://github.com/vnmoorthy/rxrelay/actions/workflows/ci.yml/badge.svg)](https://github.com/vnmoorthy/rxrelay/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-17_passing-10a895)](test/rxrelay.test.mjs)
+[![Tests](https://img.shields.io/badge/tests-24_passing-10a895)](test/rxrelay.test.mjs)
 [![PAVO](https://img.shields.io/badge/routing-PAVO--inspired-08786b)](https://github.com/vnmoorthy/pavo-bench)
 [![Live telephony](https://img.shields.io/badge/live_telephony-fails_closed-b45309)](docs/A1MOBILE_LIVE_SETUP.md)
 [![Stars](https://img.shields.io/github/stars/vnmoorthy/rxrelay?style=social)](https://github.com/vnmoorthy/rxrelay/stargazers)
 [![Forks](https://img.shields.io/github/forks/vnmoorthy/rxrelay?style=social)](https://github.com/vnmoorthy/rxrelay/network/members)
 
-[Website](https://vnmoorthy.github.io/rxrelay/) · [Quickstart](#-quickstart) · [Proof gate](#-the-proof-gate) · [Architecture](#-architecture) · [PAVO](#-pavo-route-the-pipeline-not-just-the-model) · [Pitch deck](deck/output/RxRelay_Hackathon_Pitch.pptx) · [Paper](https://openreview.net/forum?id=zrneoIxlFx)
+[Website](https://vnmoorthy.github.io/rxrelay/) · [Quickstart](#-quickstart) · [Proof gate](#-the-proof-gate) · [Architecture](#-architecture) · [PAVO](#-pavo-route-the-pipeline-not-just-the-model) · [Pitch deck](https://vnmoorthy.github.io/rxrelay/deck/pitch.html) · [PPTX](deck/output/RxRelay_Hackathon_Pitch.pptx) · [Paper](https://openreview.net/forum?id=zrneoIxlFx)
 
 </div>
 
@@ -148,7 +148,7 @@ test("failed outbound coordination cannot create a false action proof", async ()
 | :---: | :---: | :---: |
 | <img src="assets/problem.png" alt="Problem" width="100%" /> | <img src="assets/demo-flow.png" alt="Demo flow" width="100%" /> | <img src="assets/safety.png" alt="Safety" width="100%" /> |
 
-Full narrative deck: [`deck/output/RxRelay_Hackathon_Pitch.pptx`](deck/output/RxRelay_Hackathon_Pitch.pptx)
+Full narrative deck: [HTML](https://vnmoorthy.github.io/rxrelay/deck/pitch.html) · [PPTX](deck/output/RxRelay_Hackathon_Pitch.pptx) (`npm run deck`)
 
 ---
 
@@ -186,7 +186,7 @@ Two processes. One shared case file. The public tunnel only ever touches the TeX
         routing                 + local fallback              live adapter
 ```
 
-Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · **full diagram:** [`docs/ARCHITECTURE_DIAGRAM.md`](docs/ARCHITECTURE_DIAGRAM.md) · pitch slide 08 in [`assets/architecture.png`](assets/architecture.png).
+Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · **full diagram:** [`docs/ARCHITECTURE_DIAGRAM.md`](docs/ARCHITECTURE_DIAGRAM.md) · pitch architecture slide in [`assets/architecture.png`](assets/architecture.png).
 
 <img src="assets/architecture.png" alt="RxRelay detailed architecture diagram" width="100%" />
 
@@ -199,7 +199,7 @@ Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · **full diagram:** [
 git clone https://github.com/vnmoorthy/rxrelay.git
 cd rxrelay
 cp .env.example .env
-npm test        # 17 tests · node:test · no install step
+npm test        # 24 tests · node:test · no install step
 npm run deck    # rebuild portable 13-slide PPTX + open deck/pitch.html
 npm run dev     # http://localhost:3000
 ```
@@ -320,7 +320,7 @@ No tool can bypass the proof gate.
 | --- | --- |
 | Idea & creativity | Moves voice agents from talking → evidence-backed access coordination |
 | Real-world value | Removes patient-as-switchboard work in prescription access |
-| Technical execution | Case state machine, PAVO routing, TeXML gateway, counterpart portal, signed receipts, human ops, SSE, MCP, proof gate, CI + 17 tests |
+| Technical execution | Case state machine, PAVO routing, TeXML gateway, counterpart portal, signed receipts, human ops, SSE, MCP, proof gate, CI + 24 tests |
 | Voice UX | Voice-first consent, confirmation on uncertain critical details, explicit safe stops |
 | Works live | Sandbox E2E today; real inbound TeXML path; live outbound fails closed until provider accepts + returns an id |
 

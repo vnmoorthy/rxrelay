@@ -49,7 +49,8 @@ async function point(publicBase) {
   if (!response.ok) throw new Error(`Point failed (${response.status}): ${JSON.stringify(payload)}`);
   console.log(`\nClaimed number pointed to ${redact(payload.pointed_to || webhookUrl)}`);
   console.log(`Call ${payload.phone_number || process.env.A1MOBILE_PHONE_NUMBER} and say:`);
-  console.log('  "I consent to a pharmacy status follow-up and text updates."');
+  console.log('  "Please help — I\'ve been stuck at CVS on my metformin."');
+  console.log('  then: PA needed → doctor filed it → ready for pickup');
   console.log("Keep the dashboard running separately with: npm run dev");
   console.log("Voice cases appear on the proof board via shared data/cases.json\n");
 }
