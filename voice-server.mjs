@@ -3,7 +3,8 @@ import { CaseStore } from "./src/store.mjs";
 import { JsonCasePersistence } from "./src/persist.mjs";
 import { createTelephonyAdapter } from "./src/telephony.mjs";
 import { TIER_LABELS } from "./src/pavo.mjs";
-import { openPrompt, noInputPrompt, sayVoiceAttrs, isUsableSpeech } from "./src/dialogue.mjs";
+import { noInputPrompt, sayVoiceAttrs, isUsableSpeech } from "./src/dialogue.mjs";
+import { DEMO_OPEN, resolveDemoInput, fixedReplyForAction } from "./src/demo-beats.mjs";
 
 const store = new CaseStore({
   telephony: createTelephonyAdapter(),
@@ -69,17 +70,11 @@ function say(text) {
 }
 
 /**
- * STT → Gather. Prompt plays inside Gather (one prompt only).
- * Critical: `timeout` must be long enough for the Say prompt PLUS the caller
- * reply. timeout="5" with a multi-sentence greeting timed out before the
- * caller could speak → endless "Sorry, I didn't catch that."
- * Keep Say attrs Telnyx-safe (alice only). speechTimeout=auto is required for
- * speech gathers on Telnyx; without it SpeechResult often never arrives.
+ * Always speech + single DTMF digit so the 4-beat demo works even when ASR fails.
+ * Press 1 → 2 → 3 → 4, or speak the four judge lines.
  */
-function gather(prompt, action, { verified = false } = {}) {
-  const input = verified ? "speech dtmf" : "speech";
-  const numDigits = verified ? ' numDigits="8"' : "";
-  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="12" speechTimeout="auto" language="en-US"${numDigits}>${say(prompt)}</Gather><Redirect method="POST">${xmlEscape(action)}</Redirect>`;
+function gather(prompt, action) {
+  return `<Gather input="speech dtmf" numDigits="1" action="${xmlEscape(action)}" method="POST" timeout="15" speechTimeout="auto" language="en-US">${say(prompt)}</Gather><Redirect method="POST">${xmlEscape(action)}</Redirect>`;
 }
 
 function turnDedupeKey(caseId, payload) {
@@ -130,7 +125,7 @@ const server = http.createServer(async (req, res) => {
     const payload = req.method === "POST" ? await parseRequest(req) : Object.fromEntries(url.searchParams);
     if (url.pathname === "/voice") {
       const caseRecord = store.openVoiceCase({ callId: payload.CallSid || payload.call_id, from: payload.From || payload.from });
-      const instruction = gather(openPrompt(), nextUrl(req, "/voice/turn", { caseId: caseRecord.id }));
+      const instruction = gather(DEMO_OPEN, nextUrl(req, "/voice/turn", { caseId: caseRecord.id }));
       return sendXml(res, instruction);
     }
 
@@ -142,7 +137,6 @@ const server = http.createServer(async (req, res) => {
     if (replay) return sendXml(res, replay);
 
     const digits = String(payload.Digits || payload.digits || "").trim();
-    // Telnyx / TeXML variants — never drop a real transcript on a field-name mismatch.
     const speech = String(
       payload.SpeechResult
       || payload.speech_result
@@ -159,68 +153,56 @@ const server = http.createServer(async (req, res) => {
       ? confidence
       : (digits ? 0.99 : 0.85);
 
+    const demo = resolveDemoInput({ speech, digits });
     console.log(JSON.stringify({
       at: new Date().toISOString(),
       turn: "inbound",
       caseId,
-      keys: Object.keys(payload).slice(0, 30),
       speech: speech.slice(0, 160),
       digits: digits || null,
+      demoBeat: demo?.beat || null,
+      via: demo?.via || null,
       confidence: confidenceOrDefault,
-      confidenceRaw: confidenceRaw ?? null,
     }));
 
-    const quality = digits
-      ? { ok: true, reason: "digits", text: `${speech ? `${speech} ` : ""}authorization digits ${digits.split("").join(" ")}`.trim() }
-      : isUsableSpeech(speech, confidenceOrDefault);
-
-    if (!quality.ok) {
-      const retry = Number(url.searchParams.get("retry") || 0);
-      console.log(JSON.stringify({ at: new Date().toISOString(), turn: "rejected", caseId, reason: quality.reason, confidence: confidenceOrDefault, speech: speech.slice(0, 120), retry }));
-      // Rotate the re-prompt (never the identical line twice) and carry a retry counter.
-      const instruction = gather(noInputPrompt(retry), nextUrl(req, "/voice/turn", { caseId, retry: String(retry + 1) }));
-      // Do not dedupe empty/garbage — retries should re-prompt, not lock a blank turn.
-      return sendXml(res, instruction);
+    let transcript = demo?.transcript || null;
+    if (!transcript) {
+      const quality = isUsableSpeech(speech, confidenceOrDefault);
+      if (!quality.ok) {
+        const retry = Number(url.searchParams.get("retry") || 0);
+        const hint = "Please speak your request, or press 1, then 2, then 3, then 4 on the keypad.";
+        const instruction = gather(`${noInputPrompt(retry)} ${hint}`, nextUrl(req, "/voice/turn", { caseId, retry: String(retry + 1) }));
+        return sendXml(res, instruction);
+      }
+      transcript = quality.text;
     }
 
     const startedAt = Date.now();
     const result = await store.handleVoiceTurn({
       caseId,
-      transcript: quality.text,
+      transcript,
       asrConfidence: confidenceOrDefault,
       noiseLevel: Number(payload.noiseLevel || (digits ? 0.02 : 0.1)),
     });
+
+    // Exact fixed Maya lines for the 4-beat demo — judges hear the same script every time.
+    let spoken = fixedReplyForAction(result.action) || demo?.fixedReply || result.reply;
     console.log(JSON.stringify({
       at: new Date().toISOString(),
       turn: "ok",
       caseId,
-      speech: quality.text.slice(0, 140),
-      confidence: confidenceOrDefault,
-      intent: result.intent,
+      transcript: transcript.slice(0, 120),
       action: result.action,
-      source: result.inference?.source,
       status: result.case?.status?.key,
       proofReady: Boolean(result.case?.proof?.ready),
       ms: Date.now() - startedAt,
-      reply: String(result.reply || "").slice(0, 140),
+      reply: String(spoken || "").slice(0, 160),
     }));
 
-    const verified = result.route?.tier === "verified" || result.route?.jointUpgrade;
-    let spoken = result.reply;
-    if (verified && !digits && !result.case.humanReview && !result.case.digitHintSpoken) {
-      spoken = `${spoken} If you have a reference number, you can enter the digits on your keypad.`;
-      try {
-        store.markDigitHintSpoken?.(caseId);
-      } catch {
-        /* optional */
-      }
-    }
-
-    const proofReady = result.case?.proof?.ready || result.case?.status?.key === "resolved";
-    // Clean hangup after 4/4 proof — avoids a dangling Gather / "anything else?" loop.
+    const proofReady = result.case?.proof?.ready || result.case?.status?.key === "resolved" || result.action === "pharmacy_ready";
     const instruction = proofReady
       ? `${say(spoken)}<Hangup/>`
-      : gather(spoken, nextUrl(req, "/voice/turn", { caseId }), { verified });
+      : gather(spoken, nextUrl(req, "/voice/turn", { caseId }));
     rememberTurn(dedupeKey, instruction);
     return sendXml(res, instruction);
   } catch (error) {
