@@ -172,12 +172,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     const proofReady = result.case?.proof?.ready || result.case?.status?.key === "resolved";
+    // Clean hangup after 4/4 proof — avoids a dangling Gather / "anything else?" loop.
     const instruction = proofReady
-      ? say(spoken)
+      ? `${say(spoken)}<Hangup/>`
       : gather(spoken, nextUrl(req, "/voice/turn", { caseId }), { verified });
     rememberTurn(dedupeKey, instruction);
     return sendXml(res, instruction);
-  } catch {
+  } catch (error) {
+    console.error("voice webhook error:", error?.stack || error);
     return sendXml(res, say("RxRelay had a temporary issue. Please try again shortly, or ask for a human coordinator."));
   }
 });
