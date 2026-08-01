@@ -3,7 +3,7 @@ import { CaseStore } from "./src/store.mjs";
 import { JsonCasePersistence } from "./src/persist.mjs";
 import { createTelephonyAdapter } from "./src/telephony.mjs";
 import { TIER_LABELS } from "./src/pavo.mjs";
-import { openPrompt, noInputPrompt, sayVoiceAttrs } from "./src/dialogue.mjs";
+import { openPrompt, noInputPrompt, sayVoiceAttrs, isUsableSpeech } from "./src/dialogue.mjs";
 import { gatherSpeechHintsAttr } from "./src/voice-training/index.mjs";
 
 const store = new CaseStore({
@@ -13,6 +13,10 @@ const store = new CaseStore({
 });
 const PORT = Number(process.env.VOICE_PORT || 3001);
 const HOST = process.env.VOICE_HOST || "127.0.0.1";
+
+/** In-memory webhook dedupe: identical TeXML retries must not double-advance state. */
+const recentTurnKeys = new Map();
+const TURN_DEDUPE_MS = 20_000;
 
 function xmlEscape(value = "") {
   return String(value).replace(/[<>&'\"]/g, (character) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" }[character]));
@@ -66,17 +70,40 @@ function say(text) {
 }
 
 /**
- * PAVO capture upgrade: verified turns open speech + DTMF so critical
- * authorization digits can be confirmed without relying on a better LLM alone.
- * No trailing <Say> after Gather — empty SpeechResult re-prompts once via action URL
- * (avoids double-speaking the miss message).
+ * STT → Gather. Prompt plays inside Gather (one prompt only).
+ * On timeout/no-input, Redirect POSTs empty SpeechResult to the same action
+ * (TeXML skips Redirect when Gather already collected speech).
  */
 function gather(prompt, action, { verified = false } = {}) {
   const input = verified ? "speech dtmf" : "speech";
-  // Stronger STT bias from mined lexicon (Alex/CVS/metformin + PA/clinic/ready phrases).
   const hints = gatherSpeechHintsAttr(24);
   const numDigits = verified ? ' numDigits="8"' : "";
-  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="8" speechTimeout="auto" language="en-US" profanityFilter="false"${numDigits}${hints}>${say(prompt)}</Gather><Redirect method="POST">${xmlEscape(action)}</Redirect>`;
+  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="10" speechTimeout="auto" language="en-US" profanityFilter="false"${numDigits}${hints}>${say(prompt)}</Gather><Redirect method="POST">${xmlEscape(action)}</Redirect>`;
+}
+
+function turnDedupeKey(caseId, payload) {
+  const callId = payload.CallSid || payload.call_id || "";
+  const speech = String(payload.SpeechResult || payload.speech_result || payload.transcript || "").trim().toLowerCase();
+  const digits = String(payload.Digits || payload.digits || "").trim();
+  return `${caseId}|${callId}|${speech}|${digits}`;
+}
+
+function rememberTurn(key, instruction) {
+  recentTurnKeys.set(key, { instruction, at: Date.now() });
+  if (recentTurnKeys.size > 200) {
+    const cutoff = Date.now() - TURN_DEDUPE_MS;
+    for (const [k, v] of recentTurnKeys) if (v.at < cutoff) recentTurnKeys.delete(k);
+  }
+}
+
+function replayIfDuplicate(key) {
+  const prev = recentTurnKeys.get(key);
+  if (!prev) return null;
+  if (Date.now() - prev.at > TURN_DEDUPE_MS) {
+    recentTurnKeys.delete(key);
+    return null;
+  }
+  return prev.instruction;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -102,27 +129,39 @@ const server = http.createServer(async (req, res) => {
     const payload = req.method === "POST" ? await parseRequest(req) : Object.fromEntries(url.searchParams);
     if (url.pathname === "/voice") {
       const caseRecord = store.openVoiceCase({ callId: payload.CallSid || payload.call_id, from: payload.From || payload.from });
-      return sendXml(res, gather(openPrompt(), nextUrl(req, "/voice/turn", { caseId: caseRecord.id })));
+      const instruction = gather(openPrompt(), nextUrl(req, "/voice/turn", { caseId: caseRecord.id }));
+      return sendXml(res, instruction);
     }
+
     const caseId = url.searchParams.get("caseId") || payload.caseId;
     if (!caseId) return sendXml(res, say("Your voice session is missing a case reference. Please call again."));
+
+    const dedupeKey = turnDedupeKey(caseId, payload);
+    const replay = replayIfDuplicate(dedupeKey);
+    if (replay) return sendXml(res, replay);
+
     const digits = String(payload.Digits || payload.digits || "").trim();
     const speech = String(payload.SpeechResult || payload.speech_result || payload.transcript || "").trim();
-    const transcript = digits
-      ? `${speech ? `${speech} ` : ""}authorization digits ${digits.split("").join(" ")}`.trim()
-      : speech;
-    if (!transcript) {
-      return sendXml(res, gather(noInputPrompt(), nextUrl(req, "/voice/turn", { caseId })));
+    const confidence = Number(payload.Confidence || payload.confidence || (digits ? 0.99 : 0.9));
+    const quality = digits
+      ? { ok: true, reason: "digits", text: `${speech ? `${speech} ` : ""}authorization digits ${digits.split("").join(" ")}`.trim() }
+      : isUsableSpeech(speech, confidence);
+
+    if (!quality.ok) {
+      const instruction = gather(noInputPrompt(), nextUrl(req, "/voice/turn", { caseId }));
+      // Do not dedupe empty/garbage — retries should re-prompt, not lock a blank turn.
+      return sendXml(res, instruction);
     }
+
     const result = await store.handleVoiceTurn({
       caseId,
-      transcript,
-      asrConfidence: Number(payload.Confidence || payload.confidence || (digits ? 0.99 : 0.9)),
+      transcript: quality.text,
+      asrConfidence: confidence,
       noiseLevel: Number(payload.noiseLevel || (digits ? 0.02 : 0.1)),
     });
+
     const verified = result.route?.tier === "verified" || result.route?.jointUpgrade;
     let spoken = result.reply;
-    // Keypad hint once per case — repeating it every verified turn felt robotic.
     if (verified && !digits && !result.case.humanReview && !result.case.digitHintSpoken) {
       spoken = `${spoken} If you have a reference number, you can enter the digits on your keypad.`;
       try {
@@ -131,7 +170,13 @@ const server = http.createServer(async (req, res) => {
         /* optional */
       }
     }
-    return sendXml(res, gather(spoken, nextUrl(req, "/voice/turn", { caseId }), { verified }));
+
+    const proofReady = result.case?.proof?.ready || result.case?.status?.key === "resolved";
+    const instruction = proofReady
+      ? say(spoken)
+      : gather(spoken, nextUrl(req, "/voice/turn", { caseId }), { verified });
+    rememberTurn(dedupeKey, instruction);
+    return sendXml(res, instruction);
   } catch {
     return sendXml(res, say("RxRelay had a temporary issue. Please try again shortly, or ask for a human coordinator."));
   }

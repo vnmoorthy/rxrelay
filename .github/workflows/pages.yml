@@ -36,7 +36,10 @@ jobs:
         run: |
           mkdir -p _site/deck
           cp -R site/. _site/
-          cp deck/index.html deck/pitch.html deck/pitch.css _site/deck/
+          # Serve the full deck at /deck/ and /deck/pitch.html (no redirect stub).
+          cp deck/pitch.html _site/deck/pitch.html
+          cp deck/pitch.html _site/deck/index.html
+          cp deck/pitch.css _site/deck/pitch.css
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

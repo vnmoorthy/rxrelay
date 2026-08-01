@@ -23,14 +23,44 @@ export function sayVoiceAttrs() {
 export function openPrompt() {
   return [
     "Hi, this is Maya with RxRelay.",
-    "I help with prescription status — pharmacy delays, prior auth, and pickup readiness.",
-    "I can't give medical advice or change a prescription.",
+    "I help with pharmacy status and prior auth — I can't give medical advice.",
     "What's going on with your medication?",
   ].join(" ");
 }
 
 export function noInputPrompt() {
   return "Sorry, I didn't catch that. What's going on with your prescription?";
+}
+
+/**
+ * Gate STT before intent/state advances.
+ * Empty, filler, punctuation-only, or very low-confidence audio must not move the proof trail.
+ */
+export function isUsableSpeech(transcript = "", asrConfidence = 1) {
+  const text = normalizeTranscript(transcript);
+  if (!text) return { ok: false, reason: "empty", text: "" };
+
+  const confidence = Number(asrConfidence);
+  if (Number.isFinite(confidence) && confidence > 0 && confidence < 0.45) {
+    return { ok: false, reason: "low_confidence", text };
+  }
+
+  if (/^[^a-z0-9]+$/i.test(text)) return { ok: false, reason: "noise", text };
+
+  const compact = text.toLowerCase().replace(/[^\w\s']/g, " ").replace(/\s+/g, " ").trim();
+  const fillerTok = String.raw`um+|uh+|hm+|hmm+|ah+|oh+|mhm+|mm+|huh|what|sorry|okay|ok|yeah|yep|yup|nah|nope`;
+  const fillerOnly = new RegExp(`^(${fillerTok})(\\s+(${fillerTok}))*$`, "i");
+  if (fillerOnly.test(compact)) return { ok: false, reason: "filler", text };
+
+  const words = compact.split(/\s+/).filter(Boolean);
+  if (words.length === 1 && words[0].length <= 2) return { ok: false, reason: "too_short", text };
+
+  const content = /\b(help|please|pharmacy|prescription|medication|meds?|refill|prior|auth|pa|ready|pickup|doctor|clinic|insurance|cvs|walgreens|stuck|waiting|consent|metformin|filed|submitted|check|status|human|agent)\b/i;
+  if (words.length <= 1 && !content.test(compact) && !/\b(hi|hello|hey|thanks|thank)\b/i.test(compact)) {
+    return { ok: false, reason: "too_short", text };
+  }
+
+  return { ok: true, reason: "ok", text };
 }
 
 export function humanHandoffPrompt() {

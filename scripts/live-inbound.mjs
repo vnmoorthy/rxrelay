@@ -59,25 +59,73 @@ console.log(`Starting voice gateway on 127.0.0.1:${voicePort}…`);
 const voice = spawnLogged(process.execPath, ["--env-file-if-exists=.env", "voice-server.mjs"], {});
 await sleep(800);
 
-let publicUrl;
-const tunnel = spawnLogged(cloudflared, ["tunnel", "--url", `http://127.0.0.1:${voicePort}`], {
-  onLine(line) {
-    const match = line.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
-    if (match && !publicUrl) {
-      publicUrl = match[0];
-      point(publicUrl).catch((error) => {
-        console.error(error.message);
-        shutdown(1);
-      });
-    }
-  },
-});
+let publicUrl = null;
+let tunnel = null;
+let tunnelAttempts = 0;
+const MAX_TUNNEL_ATTEMPTS = 5;
+let shuttingDown = false;
 
 function shutdown(code = 0) {
-  voice.kill("SIGTERM");
-  tunnel.kill("SIGTERM");
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try { voice.kill("SIGTERM"); } catch { /* ignore */ }
+  try { tunnel?.kill("SIGTERM"); } catch { /* ignore */ }
   setTimeout(() => process.exit(code), 300);
+}
+
+function attachTunnelExit(child) {
+  child.on("exit", (code) => {
+    if (shuttingDown) return;
+    if (publicUrl) {
+      console.error(`cloudflared exited (${code}) after pointing; shutting down`);
+      shutdown(code || 1);
+      return;
+    }
+    scheduleTunnelRetry(code);
+  });
+}
+
+async function scheduleTunnelRetry(code) {
+  if (tunnelAttempts >= MAX_TUNNEL_ATTEMPTS) {
+    console.error(`cloudflared failed ${tunnelAttempts} times (last code ${code}). Voice stays local on :${voicePort}.`);
+    console.error("Retry later with: npm run live:inbound");
+    return;
+  }
+  const waitMs = Math.min(30_000, 4000 * tunnelAttempts);
+  console.error(`cloudflared exited (${code}) before URL; retrying in ${waitMs}ms…`);
+  await sleep(waitMs);
+  if (shuttingDown || publicUrl) return;
+  tunnel = startTunnel();
+  attachTunnelExit(tunnel);
+}
+
+function startTunnel() {
+  tunnelAttempts += 1;
+  console.log(`Opening Cloudflare quick tunnel (attempt ${tunnelAttempts}/${MAX_TUNNEL_ATTEMPTS})…`);
+  return spawnLogged(cloudflared, ["tunnel", "--url", `http://127.0.0.1:${voicePort}`], {
+    onLine(line) {
+      const match = line.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
+      if (match && !publicUrl) {
+        publicUrl = match[0];
+        point(publicUrl).catch((error) => {
+          console.error(error.message);
+          shutdown(1);
+        });
+      }
+    },
+  });
 }
 
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
+
+voice.on("exit", (code) => {
+  console.error(`voice-server exited (${code}); shutting down`);
+  shutdown(code || 1);
+});
+
+tunnel = startTunnel();
+attachTunnelExit(tunnel);
+
+// Keep the supervisor alive while children run.
+await new Promise(() => {});

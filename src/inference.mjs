@@ -133,6 +133,7 @@ export class PavoInferenceEngine {
       `PAVO: tier=${route.tier}; demand=${demand}`,
       "Reply for spoken playback only. About 2–4 short natural sentences. New information only. At most one question.",
     ].join("\n");
+    const timeoutMs = Number(process.env.PAVO_TIMEOUT_MS || 8000);
     try {
       const response = await this.fetch(endpoint, {
         method: "POST",
@@ -147,7 +148,9 @@ export class PavoInferenceEngine {
             { role: "user", content: userTurn },
           ],
           max_tokens: this.maxTokensFor(route),
+          temperature: 0.4,
         }),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (!response.ok) throw new Error(`Chat Completions API returned ${response.status}`);
       const text = trimSpoken(responseText(await response.json()));
@@ -163,7 +166,9 @@ export class PavoInferenceEngine {
         source: "local-safe-fallback",
         model: this.modelFor(route),
         pipeline: labels,
-        warning: error.message,
+        warning: error.name === "TimeoutError" || error.name === "AbortError"
+          ? `PAVO timeout after ${timeoutMs}ms`
+          : error.message,
       };
     }
   }

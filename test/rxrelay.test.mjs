@@ -486,3 +486,46 @@ test("forget session clears conversation memory", async () => {
   assert.equal(cleared.conversationTurns.length, 0);
   assert.equal(store.getPublicView(opened.id).patient.recipient, "[redacted]");
 });
+
+test("empty and garbage ASR do not count as usable speech", async () => {
+  const { isUsableSpeech } = await import("../src/dialogue.mjs");
+  assert.equal(isUsableSpeech("").ok, false);
+  assert.equal(isUsableSpeech("   ").ok, false);
+  assert.equal(isUsableSpeech("...").ok, false);
+  assert.equal(isUsableSpeech("um").ok, false);
+  assert.equal(isUsableSpeech("uh huh").ok, false);
+  assert.equal(isUsableSpeech("okay").ok, false);
+  assert.equal(isUsableSpeech("help me with CVS metformin", 0.2).ok, false);
+  assert.equal(isUsableSpeech("help me with CVS metformin", 0.9).ok, true);
+  assert.equal(isUsableSpeech("It's ready.").ok, true);
+  assert.equal(isUsableSpeech("Please help — I've been stuck at CVS on my metformin.").ok, true);
+});
+
+test("Alex natural path still reaches proof 4/4 with memory-safe replies", async () => {
+  const store = new CaseStore({ telephony: new DemoTelephonyAdapter(), seedDemo: false });
+  const opened = store.openVoiceCase({ callId: "alex-demo", from: "+15550005555" });
+  const lines = [
+    "Hi — please help, I've been stuck at CVS for five days on my metformin.",
+    "They said they need prior authorization before they can fill it.",
+    "My doctor filed the PA this morning.",
+    "The pharmacy says it's ready for pickup.",
+  ];
+  const replies = [];
+  for (const line of lines) {
+    const turn = await store.handleVoiceTurn({ caseId: opened.id, transcript: line, asrConfidence: 0.94 });
+    replies.push(turn.reply);
+  }
+  const c = store.get(opened.id);
+  assert.equal(c.evidence.consentRecorded, true);
+  assert.ok(c.pharmacy.blocker);
+  assert.equal(c.clinic.submissionRecorded, true);
+  assert.equal(c.pharmacy.readyForPickup, true);
+  assert.equal(c.proof.ready, true);
+  assert.equal(c.status.key, "resolved");
+  assert.equal(c.proof.checks.filter((x) => x.passed).length, 4);
+  assert.equal(new Set(replies.map((r) => r.toLowerCase())).size, replies.length);
+  for (const reply of replies) {
+    assert.doesNotMatch(reply, /say:?\s*i consent/i);
+    assert.ok(reply.split(/\s+/).length <= 90, `reply too long for phone: ${reply}`);
+  }
+});
