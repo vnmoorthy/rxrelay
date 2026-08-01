@@ -9,13 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@500&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="pitch.css" />
-  <style>
-    /* Failsafe if pitch.css is slow/blocked: still show the active slide */
-    .slide { opacity: 0; }
-    .slide.is-active { opacity: 1 !important; }
-  </style>
 </head>
 <body>
+  <div class="deck-shell">
   <div class="deck" id="deck">
 
     <!-- 01 Title -->
@@ -458,6 +454,7 @@
     </section>
 
   </div>
+  </div>
 
   <div class="ui">
     <div class="progress"><div class="progress-bar" id="progress"></div></div>
@@ -473,12 +470,20 @@
 
   <script>
     (() => {
+      const deck = document.getElementById("deck");
       const slides = [...document.querySelectorAll(".slide")];
       const progress = document.getElementById("progress");
       const notesPanel = document.getElementById("notesPanel");
       const notesText = document.getElementById("notesText");
       let index = 0;
       let notesOpen = false;
+      const STAGE_W = 1280;
+      const STAGE_H = 720;
+
+      function fit() {
+        const scale = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+        deck.style.transform = `scale(${scale})`;
+      }
 
       function show(i) {
         index = Math.max(0, Math.min(slides.length - 1, i));
@@ -512,6 +517,10 @@
           else document.exitFullscreen?.();
         }
       });
+
+      window.addEventListener("resize", fit);
+      window.addEventListener("orientationchange", fit);
+      fit();
 
       const hash = parseInt(location.hash.replace("#", ""), 10);
       show(Number.isFinite(hash) && hash >= 1 && hash <= slides.length ? hash - 1 : 0);

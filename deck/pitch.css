@@ -11,9 +11,8 @@
   --teal-glow: rgba(45, 212, 191, 0.16);
   --amber: #d8892a;
   --red: #c24b45;
-  /* Design canvas — scaled to fit any viewport (fixes clipped/empty slides). */
-  --design-w: 1280px;
-  --design-h: 720px;
+  --stage-w: 1280px;
+  --stage-h: 720px;
 }
 
 *,
@@ -27,38 +26,44 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #010a0e;
+  background: #000;
   color: #e4f2f2;
   font-family: "Sora", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-.deck {
+/* Outer viewport — black letterbox; stage scales inside via JS */
+.deck-shell {
   width: 100vw;
   height: 100vh;
-  position: relative;
   display: grid;
   place-items: center;
-  background: #010a0e;
+  background: #000;
+  overflow: hidden;
+}
+
+.deck {
+  width: var(--stage-w);
+  height: var(--stage-h);
+  position: relative;
+  transform-origin: center center;
+  background: var(--ink);
+  flex-shrink: 0;
 }
 
 .slide {
-  /* Always a full 16:9 stage, letterboxed — never a clipped strip. */
-  width: min(100vw - 16px, calc((100vh - 16px) * 16 / 9));
-  height: min(100vh - 16px, calc((100vw - 16px) * 9 / 16));
   position: absolute;
-  left: 50%;
-  top: 50%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  padding: clamp(20px, 3.2vh, 40px) clamp(24px, 3.5vw, 56px);
+  padding: 40px 56px;
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, -50%) translateX(16px);
+  transform: translateX(18px);
   transition: opacity 0.35s ease, transform 0.35s ease;
   overflow: hidden;
-  border-radius: 10px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
   background:
     radial-gradient(900px 520px at 92% -8%, var(--teal-glow), transparent 58%),
     radial-gradient(640px 400px at -8% 100%, rgba(13, 148, 136, 0.08), transparent 50%),
@@ -68,7 +73,7 @@ body {
 .slide.is-active {
   opacity: 1;
   pointer-events: auto;
-  transform: translate(-50%, -50%) translateX(0);
+  transform: translateX(0);
   z-index: 2;
 }
 
@@ -207,11 +212,10 @@ h2 {
 }
 
 .hero-title {
-  font-size: clamp(2rem, 5.2vw, 3.6rem);
+  font-size: 52px;
   line-height: 1.05;
   margin: 0 0 8px;
   color: #fff;
-  overflow-wrap: anywhere;
 }
 
 .pill-row {
