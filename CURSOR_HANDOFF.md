@@ -1,6 +1,6 @@
 ## 0.2 Completeness surge
 
-Added signed proof receipts, counterpart attestation portal, human ops queue, timeout escalation, live SSE, verified speech+DTMF capture, redesigned site, portable 12-slide HTML+PPTX deck.
+Added signed proof receipts, counterpart attestation portal, human ops queue, timeout escalation, live SSE, verified speech+DTMF capture, redesigned site, portable 13-slide HTML+PPTX deck.
 
 # RxRelay — Cursor continuation handoff
 
@@ -45,7 +45,7 @@ voice-server.mjs      Narrow token-protected TeXML inbound phone server
 public/               Proof-board UI and PAVO lab
 test/rxrelay.test.mjs Unit/state tests
 docs/                 Detailed architecture, setup, and demo script
-deck/                 10-slide pitch deck source and rendered PPTX
+deck/                 13-slide pitch deck source and rendered PPTX
 ```
 
 Primary documentation:
@@ -54,7 +54,7 @@ Primary documentation:
 - `docs/ARCHITECTURE.md` — implementation-level architecture.
 - `docs/A1MOBILE_LIVE_SETUP.md` — production safety and a1 setup.
 - `docs/DEMO.md` — short judging demo.
-- `deck/output/RxRelay_Hackathon_Pitch.pptx` — 10-slide deck.
+- `deck/output/RxRelay_Hackathon_Pitch.pptx` — 13-slide deck (`npm run deck`). HTML: `deck/pitch.html` / https://vnmoorthy.github.io/rxrelay/deck/pitch.html
 
 ## 4. Current implementation and verification
 

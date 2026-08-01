@@ -16,13 +16,11 @@ A case can close only when **consent ∧ action ∧ counterpart outcome ∧ pati
 [![Runtime deps](https://img.shields.io/badge/runtime_deps-0-08786b?style=for-the-badge)](package.json)
 
 [![CI](https://github.com/vnmoorthy/rxrelay/actions/workflows/ci.yml/badge.svg)](https://github.com/vnmoorthy/rxrelay/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-24_passing-10a895)](test/rxrelay.test.mjs)
+[![Tests](https://img.shields.io/badge/tests-27_passing-10a895)](test/rxrelay.test.mjs)
 [![PAVO](https://img.shields.io/badge/routing-PAVO--inspired-08786b)](https://github.com/vnmoorthy/pavo-bench)
 [![Live telephony](https://img.shields.io/badge/live_telephony-fails_closed-b45309)](docs/A1MOBILE_LIVE_SETUP.md)
-[![Stars](https://img.shields.io/github/stars/vnmoorthy/rxrelay?style=social)](https://github.com/vnmoorthy/rxrelay/stargazers)
-[![Forks](https://img.shields.io/github/forks/vnmoorthy/rxrelay?style=social)](https://github.com/vnmoorthy/rxrelay/network/members)
 
-[Website](https://vnmoorthy.github.io/rxrelay/) · [Quickstart](#-quickstart) · [Proof gate](#-the-proof-gate) · [Architecture](#-architecture) · [PAVO](#-pavo-route-the-pipeline-not-just-the-model) · [Pitch deck](https://vnmoorthy.github.io/rxrelay/deck/pitch.html) · [PPTX](deck/output/RxRelay_Hackathon_Pitch.pptx) · [Paper](https://openreview.net/forum?id=zrneoIxlFx)
+[Website](https://vnmoorthy.github.io/rxrelay/) · [Judge demo](docs/JUDGE_DEMO.md) · [Pitch deck](https://vnmoorthy.github.io/rxrelay/deck/pitch.html) · [PPTX](deck/output/RxRelay_Hackathon_Pitch.pptx) · [Quickstart](#-quickstart) · [Proof gate](#-the-proof-gate) · [Paper](https://openreview.net/forum?id=zrneoIxlFx)
 
 </div>
 
@@ -62,6 +60,8 @@ Everything judges need for demo + evaluation is shipped and tested.
 - [Related work](#-related-work)
 - [Repository map](#-repository-map)
 - [Contributing](#-contributing)
+
+**Demo number (live inbound):** `+1 (802) 676-8127` · full judge script: [`docs/JUDGE_DEMO.md`](docs/JUDGE_DEMO.md)
 
 ---
 
@@ -199,14 +199,19 @@ Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · **full diagram:** [
 git clone https://github.com/vnmoorthy/rxrelay.git
 cd rxrelay
 cp .env.example .env
-npm test        # 24 tests · node:test · no install step
-npm run deck    # rebuild portable 13-slide PPTX + open deck/pitch.html
+npm test        # 27 tests · node:test · no install step
+npm run deck    # rebuild PPTX → deck/output/… ; HTML at deck/pitch.html
 npm run dev     # http://localhost:3000
 ```
 
 There is nothing to `npm install`. The sandbox demo has **zero runtime dependencies** — Node 20+ provides the HTTP server, test runner, `--env-file-if-exists`, and `fetch`.
 
 Default mode is `TELEPHONY_PROVIDER=demo` with `ALLOW_LIVE_TELEPHONY=false`, so the entire flow runs without dialing or texting a real person.
+
+**Pitch deck**
+- Live HTML: [vnmoorthy.github.io/rxrelay/deck/pitch.html](https://vnmoorthy.github.io/rxrelay/deck/pitch.html)
+- Local HTML: [`deck/pitch.html`](deck/pitch.html) (fullscreen · ← → · `N` notes)
+- PPTX: `npm run deck` → [`deck/output/RxRelay_Hackathon_Pitch.pptx`](deck/output/RxRelay_Hackathon_Pitch.pptx)
 
 ### Demo in 100 seconds
 
@@ -218,7 +223,7 @@ Default mode is `TELEPHONY_PROVIDER=demo` with `ALLOW_LIVE_TELEPHONY=false`, so 
 6. Watch the close gate turn green only at **4/4**.
 7. Try an uncertain / unsafe turn in the PAVO lab — upgrade the pipeline or safe-stop; never invent completion.
 
-Full script: [`docs/DEMO.md`](docs/DEMO.md)
+Full script (dashboard sandbox): [`docs/DEMO.md`](docs/DEMO.md) · **judge live call:** [`docs/JUDGE_DEMO.md`](docs/JUDGE_DEMO.md) (`+18026768127`)
 
 ---
 
@@ -295,7 +300,10 @@ Live mode is a configuration decision, never a code-path accident.
 | `record_consent` | Record explicit patient consent |
 | `begin_coordination_call` | Start a non-clinical pharmacy status call |
 | `record_external_outcome` | Record `pharmacy_blocker` · `clinic_submission` · `pharmacy_ready` |
+| `issue_counterpart_link` | Issue a single-use pharmacy/clinic/insurer attestation link |
+| `export_proof_receipt` | Export a signed hash-chained proof receipt |
 | `get_case_brief` | Return status + deterministic resolution proof |
+| `list_human_queue` | List cases held for human review |
 
 No tool can bypass the proof gate.
 
@@ -320,7 +328,7 @@ No tool can bypass the proof gate.
 | --- | --- |
 | Idea & creativity | Moves voice agents from talking → evidence-backed access coordination |
 | Real-world value | Removes patient-as-switchboard work in prescription access |
-| Technical execution | Case state machine, PAVO routing, TeXML gateway, counterpart portal, signed receipts, human ops, SSE, MCP, proof gate, CI + 24 tests |
+| Technical execution | Case state machine, PAVO routing, TeXML gateway, counterpart portal, signed receipts, human ops, SSE, MCP (8), proof gate, CI + 27 tests |
 | Voice UX | Voice-first consent, confirmation on uncertain critical details, explicit safe stops |
 | Works live | Sandbox E2E today; real inbound TeXML path; live outbound fails closed until provider accepts + returns an id |
 
@@ -344,20 +352,26 @@ No tool can bypass the proof gate.
 ## 📁 Repository map
 
 ```text
-src/pavo.mjs          PAVO-inspired demand-conditioned routing (pure function)
-src/inference.mjs     Guarded OpenAI-compatible Responses client + local fallback
-src/store.mjs         Consent-gated case state machine + proof gate
-src/persist.mjs       Shared local JSON store for dashboard + voice
-src/telephony.mjs     Sandbox adapter + fail-closed live provider adapter
-server.mjs            HTTP API, webhook seam, MCP endpoint
-voice-server.mjs      Token-protected TeXML inbound gateway
-scripts/              live:inbound · point · verify · confirm
-public/               Proof-board dashboard
-site/                 Marketing site → GitHub Pages
-assets/               Social preview + pitch visuals for the README
-docs/                 Architecture, live setup, demo script
-deck/                 13-slide hackathon pitch deck
-test/                 node:test suite (routing, consent, proof honesty)
+src/pavo.mjs              PAVO-inspired demand-conditioned routing (pure function)
+src/inference.mjs         Guarded OpenAI-compatible client + local fallback
+src/dialogue.mjs          Phone turn shaping, ASR repairs, TeXML Say helpers
+src/voice-lexicon.mjs     Consent / intent paraphrase expansion
+src/voice-training/       Mined lexicon + few-shot exemplars for Maya
+src/store.mjs             Consent-gated case state machine + proof gate
+src/persist.mjs           Shared local JSON store for dashboard + voice
+src/telephony.mjs         Sandbox adapter + fail-closed live provider adapter
+src/receipt.mjs           Signed hash-chained proof receipts
+src/counterpart.mjs       Magic-link attestation tokens
+src/bus.mjs               Case event bus for live SSE
+server.mjs                HTTP API, webhook seam, MCP endpoint, proof board
+voice-server.mjs          Token-protected TeXML inbound gateway
+scripts/                  live:inbound · point · verify · confirm
+public/                   Proof-board dashboard
+site/                     Marketing site → GitHub Pages
+assets/                   Social preview + pitch visuals for the README
+docs/                     Architecture, live setup, DEMO, JUDGE_DEMO
+deck/                     13-slide HTML + PPTX (`npm run deck`)
+test/                     node:test suite (27) — routing, consent, proof honesty
 ```
 
 ---

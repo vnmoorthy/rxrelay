@@ -3,7 +3,17 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Consent-first voice coordination for prescription access.",
+  "description": "Consent-first voice coordination for prescription access. A case closes only when consent ∧ action ∧ counterpart outcome ∧ patient update are proven.",
+  "author": "vnmoorthy",
+  "license": "MIT",
+  "homepage": "https://vnmoorthy.github.io/rxrelay/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vnmoorthy/rxrelay.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vnmoorthy/rxrelay/issues"
+  },
   "scripts": {
     "dev": "node --env-file-if-exists=.env server.mjs",
     "start": "node --env-file-if-exists=.env server.mjs",

@@ -696,7 +696,8 @@ async function main() {
   await fs.writeFile(OUT_FILE, buf);
   const stat = await fs.stat(OUT_FILE);
   console.log(`Wrote ${SLIDES.length} slides → ${OUT_FILE} (${stat.size} bytes)`);
-  console.log(`HTML deck: deck/pitch.html (open fullscreen, ← → navigate, N for notes)`);
+  console.log(`HTML deck: deck/pitch.html (local) · https://vnmoorthy.github.io/rxrelay/deck/pitch.html`);
+  console.log(`Navigate fullscreen with ← → ; press N for speaker notes`);
   if (stat.size < 4096) {
     console.warn("Warning: output file seems unusually small");
     process.exitCode = 1;
