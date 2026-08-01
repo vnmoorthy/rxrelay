@@ -70,16 +70,16 @@ function say(text) {
 
 /**
  * STT → Gather. Prompt plays inside Gather (one prompt only).
- * Telnyx-safe minimal attribute set only — exotic attrs (speechTimeout=auto,
- * profanityFilter, long hints) have triggered "An application error has
- * occurred" on the Telnyx TeXML side despite our HTTP 200.
- * On timeout/no-input, Redirect POSTs empty SpeechResult to the same action
- * (TeXML skips Redirect when Gather already collected speech).
+ * Critical: `timeout` must be long enough for the Say prompt PLUS the caller
+ * reply. timeout="5" with a multi-sentence greeting timed out before the
+ * caller could speak → endless "Sorry, I didn't catch that."
+ * Keep Say attrs Telnyx-safe (alice only). speechTimeout=auto is required for
+ * speech gathers on Telnyx; without it SpeechResult often never arrives.
  */
 function gather(prompt, action, { verified = false } = {}) {
   const input = verified ? "speech dtmf" : "speech";
   const numDigits = verified ? ' numDigits="8"' : "";
-  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="5" language="en-US"${numDigits}>${say(prompt)}</Gather><Redirect method="POST">${xmlEscape(action)}</Redirect>`;
+  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="12" speechTimeout="auto" language="en-US"${numDigits}>${say(prompt)}</Gather><Redirect method="POST">${xmlEscape(action)}</Redirect>`;
 }
 
 function turnDedupeKey(caseId, payload) {
@@ -142,15 +142,41 @@ const server = http.createServer(async (req, res) => {
     if (replay) return sendXml(res, replay);
 
     const digits = String(payload.Digits || payload.digits || "").trim();
-    const speech = String(payload.SpeechResult || payload.speech_result || payload.transcript || "").trim();
-    const confidence = Number(payload.Confidence || payload.SpeechResultConfidence || payload.confidence || (digits ? 0.99 : 0.9));
+    // Telnyx / TeXML variants — never drop a real transcript on a field-name mismatch.
+    const speech = String(
+      payload.SpeechResult
+      || payload.speech_result
+      || payload.UnstableSpeechResult
+      || payload.RecognitionResult
+      || payload.Speech
+      || payload.transcript
+      || payload.TranscriptionText
+      || "",
+    ).trim();
+    const confidenceRaw = payload.Confidence ?? payload.SpeechResultConfidence ?? payload.confidence ?? payload.Stability;
+    const confidence = Number(confidenceRaw);
+    const confidenceOrDefault = Number.isFinite(confidence) && confidence > 0
+      ? confidence
+      : (digits ? 0.99 : 0.85);
+
+    console.log(JSON.stringify({
+      at: new Date().toISOString(),
+      turn: "inbound",
+      caseId,
+      keys: Object.keys(payload).slice(0, 30),
+      speech: speech.slice(0, 160),
+      digits: digits || null,
+      confidence: confidenceOrDefault,
+      confidenceRaw: confidenceRaw ?? null,
+    }));
+
     const quality = digits
       ? { ok: true, reason: "digits", text: `${speech ? `${speech} ` : ""}authorization digits ${digits.split("").join(" ")}`.trim() }
-      : isUsableSpeech(speech, confidence);
+      : isUsableSpeech(speech, confidenceOrDefault);
 
     if (!quality.ok) {
       const retry = Number(url.searchParams.get("retry") || 0);
-      console.log(JSON.stringify({ at: new Date().toISOString(), turn: "rejected", caseId, reason: quality.reason, confidence, speech: speech.slice(0, 120), retry }));
+      console.log(JSON.stringify({ at: new Date().toISOString(), turn: "rejected", caseId, reason: quality.reason, confidence: confidenceOrDefault, speech: speech.slice(0, 120), retry }));
       // Rotate the re-prompt (never the identical line twice) and carry a retry counter.
       const instruction = gather(noInputPrompt(retry), nextUrl(req, "/voice/turn", { caseId, retry: String(retry + 1) }));
       // Do not dedupe empty/garbage — retries should re-prompt, not lock a blank turn.
@@ -161,7 +187,7 @@ const server = http.createServer(async (req, res) => {
     const result = await store.handleVoiceTurn({
       caseId,
       transcript: quality.text,
-      asrConfidence: confidence,
+      asrConfidence: confidenceOrDefault,
       noiseLevel: Number(payload.noiseLevel || (digits ? 0.02 : 0.1)),
     });
     console.log(JSON.stringify({
@@ -169,7 +195,7 @@ const server = http.createServer(async (req, res) => {
       turn: "ok",
       caseId,
       speech: quality.text.slice(0, 140),
-      confidence,
+      confidence: confidenceOrDefault,
       intent: result.intent,
       action: result.action,
       source: result.inference?.source,

@@ -21,20 +21,16 @@ export function sayVoiceAttrs() {
   return ` voice="${voice}"`;
 }
 
-/** Short greeting — phone callers hang up on menu dumps. */
+/** Short greeting — leave room in Gather timeout for the caller to answer. */
 export function openPrompt() {
-  return [
-    "Hi, this is Maya with RxRelay.",
-    "I help with pharmacy status and prior auth — I can't give medical advice.",
-    "What's going on with your medication?",
-  ].join(" ");
+  return "Hi, this is Maya with RxRelay. How can I help with your prescription today?";
 }
 
 /** Rotating re-prompts — never the identical line twice in a row. */
 const NO_INPUT_PROMPTS = [
-  "Sorry, I didn't catch that. Tell me what you need — for example, which pharmacy you're stuck at.",
-  "I still couldn't hear you. You can say something like: I need help with my prescription at CVS.",
-  "It's hard to hear you on this line. One more time — what do you need help with?",
+  "Sorry — I didn't catch that. Please say it again after I finish.",
+  "Still hard to hear. Try: please help, I'm stuck at CVS on my metformin.",
+  "One more time after the beep of silence — what do you need help with?",
 ];
 
 export function noInputPrompt(attempt = 0) {
@@ -44,7 +40,7 @@ export function noInputPrompt(attempt = 0) {
 
 /**
  * Gate STT before intent/state advances.
- * Empty, filler, punctuation-only, or very low-confidence audio must not move the proof trail.
+ * Prefer accepting imperfect phone ASR over looping "didn't catch that."
  */
 export function isUsableSpeech(transcript = "", asrConfidence = 1) {
   const text = normalizeTranscript(transcript);
@@ -53,28 +49,23 @@ export function isUsableSpeech(transcript = "", asrConfidence = 1) {
   if (/^[^a-z0-9]+$/i.test(text)) return { ok: false, reason: "noise", text };
 
   const compact = text.toLowerCase().replace(/[^\w\s']/g, " ").replace(/\s+/g, " ").trim();
-  const content = /\b(help|please|pharmacy|prescription|medication|meds?|refill|prior|auth|pa|ready|pickup|doctor|clinic|insurance|cvs|walgreens|stuck|waiting|consent|metformin|filed|submitted|check|status|human|agent)\b/i;
-  const carriesContent = content.test(compact);
+  const words = compact.split(/\s+/).filter(Boolean);
 
-  // Phone ASR often reports modest confidence on perfectly good speech.
-  // Content-bearing turns (pharmacy, PA, ready, med names…) get a much lower
-  // floor so the demo path never stalls on the "didn't catch that" loop.
-  const confidence = Number(asrConfidence);
-  const floor = carriesContent ? 0.25 : 0.45;
-  if (Number.isFinite(confidence) && confidence > 0 && confidence < floor) {
-    return { ok: false, reason: "low_confidence", text };
-  }
-
-  const fillerTok = String.raw`um+|uh+|hm+|hmm+|ah+|oh+|mhm+|mm+|huh|what|sorry|okay|ok|yeah|yep|yup|nah|nope`;
+  const fillerTok = String.raw`um+|uh+|hm+|hmm+|ah+|oh+|mhm+|mm+|huh`;
   const fillerOnly = new RegExp(`^(${fillerTok})(\\s+(${fillerTok}))*$`, "i");
   if (fillerOnly.test(compact)) return { ok: false, reason: "filler", text };
 
-  const words = compact.split(/\s+/).filter(Boolean);
-  if (words.length === 1 && words[0].length <= 2) return { ok: false, reason: "too_short", text };
-
-  if (words.length <= 1 && !carriesContent && !/\b(hi|hello|hey|thanks|thank)\b/i.test(compact)) {
-    return { ok: false, reason: "too_short", text };
+  // Accept almost any real phrase — phone Confidence is unreliable.
+  if (words.length >= 2 || words.some((w) => w.length >= 4)) {
+    return { ok: true, reason: "ok", text };
   }
+
+  const confidence = Number(asrConfidence);
+  if (Number.isFinite(confidence) && confidence > 0 && confidence < 0.15) {
+    return { ok: false, reason: "low_confidence", text };
+  }
+
+  if (words.length === 1 && words[0].length <= 2) return { ok: false, reason: "too_short", text };
 
   return { ok: true, reason: "ok", text };
 }

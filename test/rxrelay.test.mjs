@@ -494,8 +494,8 @@ test("empty and garbage ASR do not count as usable speech", async () => {
   assert.equal(isUsableSpeech("...").ok, false);
   assert.equal(isUsableSpeech("um").ok, false);
   assert.equal(isUsableSpeech("uh huh").ok, false);
-  assert.equal(isUsableSpeech("okay").ok, false);
-  assert.equal(isUsableSpeech("help me with CVS metformin", 0.2).ok, false);
+  assert.equal(isUsableSpeech("okay").ok, true);
+  assert.equal(isUsableSpeech("help me with CVS metformin", 0.2).ok, true);
   assert.equal(isUsableSpeech("help me with CVS metformin", 0.9).ok, true);
   assert.equal(isUsableSpeech("It's ready.").ok, true);
   assert.equal(isUsableSpeech("Please help — I've been stuck at CVS on my metformin.").ok, true);
