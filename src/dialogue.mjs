@@ -14,9 +14,11 @@ import {
 } from "./voice-lexicon.mjs";
 
 export function sayVoiceAttrs() {
-  const voice = process.env.TEXML_VOICE || "Polly.Joanna-Neural";
-  const speed = process.env.TEXML_VOICE_SPEED || "0.92";
-  return ` voice="${voice}" voiceSpeed="${speed}"`;
+  // Telnyx TeXML: keep Say minimal. Exotic attrs (voiceSpeed, *-Neural) can
+  // trigger "An application error has occurred. Goodbye." — "alice" is the
+  // safest baseline voice for proving the call path.
+  const voice = process.env.TEXML_VOICE || "alice";
+  return ` voice="${voice}"`;
 }
 
 /** Short greeting — phone callers hang up on menu dumps. */

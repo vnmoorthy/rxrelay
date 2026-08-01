@@ -4,7 +4,6 @@ import { JsonCasePersistence } from "./src/persist.mjs";
 import { createTelephonyAdapter } from "./src/telephony.mjs";
 import { TIER_LABELS } from "./src/pavo.mjs";
 import { openPrompt, noInputPrompt, sayVoiceAttrs, isUsableSpeech } from "./src/dialogue.mjs";
-import { gatherSpeechHintsAttr } from "./src/voice-training/index.mjs";
 
 const store = new CaseStore({
   telephony: createTelephonyAdapter(),
@@ -71,14 +70,16 @@ function say(text) {
 
 /**
  * STT → Gather. Prompt plays inside Gather (one prompt only).
+ * Telnyx-safe minimal attribute set only — exotic attrs (speechTimeout=auto,
+ * profanityFilter, long hints) have triggered "An application error has
+ * occurred" on the Telnyx TeXML side despite our HTTP 200.
  * On timeout/no-input, Redirect POSTs empty SpeechResult to the same action
  * (TeXML skips Redirect when Gather already collected speech).
  */
 function gather(prompt, action, { verified = false } = {}) {
   const input = verified ? "speech dtmf" : "speech";
-  const hints = gatherSpeechHintsAttr(24);
   const numDigits = verified ? ' numDigits="8"' : "";
-  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="10" speechTimeout="auto" language="en-US" profanityFilter="false"${numDigits}${hints}>${say(prompt)}</Gather><Redirect method="POST">${xmlEscape(action)}</Redirect>`;
+  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="5" language="en-US"${numDigits}>${say(prompt)}</Gather><Redirect method="POST">${xmlEscape(action)}</Redirect>`;
 }
 
 function turnDedupeKey(caseId, payload) {
@@ -119,7 +120,7 @@ const server = http.createServer(async (req, res) => {
         strongModel: process.env.PAVO_STRONG_MODEL || null,
         inferenceBase: process.env.PAVO_OPENAI_BASE_URL ? String(process.env.PAVO_OPENAI_BASE_URL).replace(/\/$/, "") : null,
         captureUpgrade: TIER_LABELS.verified.captureMode,
-        voice: process.env.TEXML_VOICE || "Polly.Joanna-Neural",
+        voice: process.env.TEXML_VOICE || "alice",
       });
     }
     if (!["GET", "POST"].includes(req.method) || !["/voice", "/voice/turn"].includes(url.pathname)) {
