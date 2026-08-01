@@ -30,8 +30,16 @@ export function openPrompt() {
   ].join(" ");
 }
 
-export function noInputPrompt() {
-  return "Sorry, I didn't catch that. What's going on with your prescription?";
+/** Rotating re-prompts — never the identical line twice in a row. */
+const NO_INPUT_PROMPTS = [
+  "Sorry, I didn't catch that. Tell me what you need — for example, which pharmacy you're stuck at.",
+  "I still couldn't hear you. You can say something like: I need help with my prescription at CVS.",
+  "It's hard to hear you on this line. One more time — what do you need help with?",
+];
+
+export function noInputPrompt(attempt = 0) {
+  const index = Math.abs(Number(attempt) || 0) % NO_INPUT_PROMPTS.length;
+  return NO_INPUT_PROMPTS[index];
 }
 
 /**
@@ -42,14 +50,21 @@ export function isUsableSpeech(transcript = "", asrConfidence = 1) {
   const text = normalizeTranscript(transcript);
   if (!text) return { ok: false, reason: "empty", text: "" };
 
-  const confidence = Number(asrConfidence);
-  if (Number.isFinite(confidence) && confidence > 0 && confidence < 0.45) {
-    return { ok: false, reason: "low_confidence", text };
-  }
-
   if (/^[^a-z0-9]+$/i.test(text)) return { ok: false, reason: "noise", text };
 
   const compact = text.toLowerCase().replace(/[^\w\s']/g, " ").replace(/\s+/g, " ").trim();
+  const content = /\b(help|please|pharmacy|prescription|medication|meds?|refill|prior|auth|pa|ready|pickup|doctor|clinic|insurance|cvs|walgreens|stuck|waiting|consent|metformin|filed|submitted|check|status|human|agent)\b/i;
+  const carriesContent = content.test(compact);
+
+  // Phone ASR often reports modest confidence on perfectly good speech.
+  // Content-bearing turns (pharmacy, PA, ready, med names…) get a much lower
+  // floor so the demo path never stalls on the "didn't catch that" loop.
+  const confidence = Number(asrConfidence);
+  const floor = carriesContent ? 0.25 : 0.45;
+  if (Number.isFinite(confidence) && confidence > 0 && confidence < floor) {
+    return { ok: false, reason: "low_confidence", text };
+  }
+
   const fillerTok = String.raw`um+|uh+|hm+|hmm+|ah+|oh+|mhm+|mm+|huh|what|sorry|okay|ok|yeah|yep|yup|nah|nope`;
   const fillerOnly = new RegExp(`^(${fillerTok})(\\s+(${fillerTok}))*$`, "i");
   if (fillerOnly.test(compact)) return { ok: false, reason: "filler", text };
@@ -57,8 +72,7 @@ export function isUsableSpeech(transcript = "", asrConfidence = 1) {
   const words = compact.split(/\s+/).filter(Boolean);
   if (words.length === 1 && words[0].length <= 2) return { ok: false, reason: "too_short", text };
 
-  const content = /\b(help|please|pharmacy|prescription|medication|meds?|refill|prior|auth|pa|ready|pickup|doctor|clinic|insurance|cvs|walgreens|stuck|waiting|consent|metformin|filed|submitted|check|status|human|agent)\b/i;
-  if (words.length <= 1 && !content.test(compact) && !/\b(hi|hello|hey|thanks|thank)\b/i.test(compact)) {
+  if (words.length <= 1 && !carriesContent && !/\b(hi|hello|hey|thanks|thank)\b/i.test(compact)) {
     return { ok: false, reason: "too_short", text };
   }
 
@@ -270,6 +284,23 @@ export function enforceMemoryGuards(reply, {
     }
   }
 
+  // The call opener already asked "What's going on with your medication?".
+  // Any later "what's going on…" re-ask is the looping-IVR failure mode —
+  // replace that sentence with a status-appropriate, forward-moving question.
+  const goingOn = /what'?s going on(?: with (?:your|the|my|it)?[^.?!]*)?\?/gi;
+  if (/what'?s going on/i.test(text)) {
+    const forwardAsk = {
+      ready: "Should I start the pharmacy status check now?",
+      coordinating: "What did the pharmacy tell you?",
+      waiting_clinic: "Has your doctor filed the prior auth yet?",
+      waiting_pharmacy: "Has the pharmacy said it's ready for pickup?",
+      awaiting_update: "Your pickup update is on its way.",
+      resolved: "You're all set.",
+    }[statusKey] || "What's the latest from the pharmacy?";
+    text = text.replace(goingOn, "").replace(/\s{2,}/g, " ").trim();
+    text = text ? `${text} ${forwardAsk}` : forwardAsk;
+  }
+
   const pattern = STATUS_QUESTION_PATTERNS[statusKey]
     || (consented ? null : STATUS_QUESTION_PATTERNS.ask_consent);
   const alreadyAsked = askedStatusQuestions?.[statusKey]
@@ -313,6 +344,7 @@ export function scriptedConversationalReply({
   const ctx = {
     caseId,
     pharmacy: notes.pharmacyName ? ` at ${notes.pharmacyName}` : "",
+    pharmacyName: notes.pharmacyName || "",
     med: notes.medicationHint ? ` ${notes.medicationHint}` : "",
   };
 

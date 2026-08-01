@@ -438,28 +438,28 @@
       "id": "alex-help",
       "beat": "help_consent",
       "caller": "Hi — please help, I've been stuck at CVS for five days on my metformin.",
-      "maya": "Got it — CVS and metformin, five days. I've started a pharmacy status check. What did they tell you so far?",
+      "maya": "Got it — I've got your okay and I'm checking status with CVS on your metformin now. What did they tell you?",
       "style": "Acknowledge pharmacy + med + wait; confirm action once; ask one fact question."
     },
     {
       "id": "alex-pa",
       "beat": "pharmacy_blocker",
       "caller": "They said they need prior authorization before they can fill it.",
-      "maya": "Prior auth is on the record. Tell me when your doctor or clinic files it.",
+      "maya": "I've logged that CVS needs prior auth, and noted we're waiting on your clinic. Has your doctor filed it yet?",
       "style": "Name the blocker once; point to the next real fact needed."
     },
     {
       "id": "alex-clinic",
       "beat": "clinic_submission",
       "caller": "My doctor filed the PA this morning.",
-      "maya": "Clinic submission recorded. Let me know when the pharmacy says it's ready for pickup.",
+      "maya": "Perfect — I've recorded the clinic filed the PA, and I'm pushing it back to the pharmacy for fill confirmation. Tell me when they say it's ready.",
       "style": "Confirm the clinic fact; wait for independent pharmacy readiness."
     },
     {
       "id": "alex-ready",
       "beat": "pharmacy_ready",
       "caller": "The pharmacy says it's ready for pickup.",
-      "maya": "Great — readiness is recorded and your status update went out. Anything else before we wrap?",
+      "maya": "Great news — I've confirmed it's ready for pickup and sent your status update. Pickup is usually same-day once it's marked ready — call the pharmacy for the exact window. You're all set.",
       "style": "Celebrate briefly; close without a menu."
     },
     {

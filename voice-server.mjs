@@ -143,23 +143,41 @@ const server = http.createServer(async (req, res) => {
 
     const digits = String(payload.Digits || payload.digits || "").trim();
     const speech = String(payload.SpeechResult || payload.speech_result || payload.transcript || "").trim();
-    const confidence = Number(payload.Confidence || payload.confidence || (digits ? 0.99 : 0.9));
+    const confidence = Number(payload.Confidence || payload.SpeechResultConfidence || payload.confidence || (digits ? 0.99 : 0.9));
     const quality = digits
       ? { ok: true, reason: "digits", text: `${speech ? `${speech} ` : ""}authorization digits ${digits.split("").join(" ")}`.trim() }
       : isUsableSpeech(speech, confidence);
 
     if (!quality.ok) {
-      const instruction = gather(noInputPrompt(), nextUrl(req, "/voice/turn", { caseId }));
+      const retry = Number(url.searchParams.get("retry") || 0);
+      console.log(JSON.stringify({ at: new Date().toISOString(), turn: "rejected", caseId, reason: quality.reason, confidence, speech: speech.slice(0, 120), retry }));
+      // Rotate the re-prompt (never the identical line twice) and carry a retry counter.
+      const instruction = gather(noInputPrompt(retry), nextUrl(req, "/voice/turn", { caseId, retry: String(retry + 1) }));
       // Do not dedupe empty/garbage — retries should re-prompt, not lock a blank turn.
       return sendXml(res, instruction);
     }
 
+    const startedAt = Date.now();
     const result = await store.handleVoiceTurn({
       caseId,
       transcript: quality.text,
       asrConfidence: confidence,
       noiseLevel: Number(payload.noiseLevel || (digits ? 0.02 : 0.1)),
     });
+    console.log(JSON.stringify({
+      at: new Date().toISOString(),
+      turn: "ok",
+      caseId,
+      speech: quality.text.slice(0, 140),
+      confidence,
+      intent: result.intent,
+      action: result.action,
+      source: result.inference?.source,
+      status: result.case?.status?.key,
+      proofReady: Boolean(result.case?.proof?.ready),
+      ms: Date.now() - startedAt,
+      reply: String(result.reply || "").slice(0, 140),
+    }));
 
     const verified = result.route?.tier === "verified" || result.route?.jointUpgrade;
     let spoken = result.reply;

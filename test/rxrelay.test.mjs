@@ -501,6 +501,69 @@ test("empty and garbage ASR do not count as usable speech", async () => {
   assert.equal(isUsableSpeech("Please help — I've been stuck at CVS on my metformin.").ok, true);
 });
 
+test("exact judge demo lines: every turn acts and speaks a first-person ack", async () => {
+  const store = new CaseStore({ telephony: new DemoTelephonyAdapter(), seedDemo: false });
+  const opened = store.openVoiceCase({ callId: "judge-demo", from: "+15550009999" });
+  const lines = [
+    ["Please help — I've been stuck at CVS on my metformin.", "start_coordination"],
+    ["They need prior authorization.", "pharmacy_blocker"],
+    ["My doctor filed the PA.", "clinic_submission"],
+    ["It's ready for pickup.", "pharmacy_ready"],
+  ];
+  const replies = [];
+  for (const [line, expectedAction] of lines) {
+    const turn = await store.handleVoiceTurn({ caseId: opened.id, transcript: line, asrConfidence: 0.9 });
+    assert.equal(turn.action, expectedAction, `"${line}" must trigger ${expectedAction}`);
+    assert.equal(turn.inference.source, "scripted-action", "action turns must use the scripted ack, not the LLM");
+    replies.push(turn.reply);
+  }
+  const c = store.get(opened.id);
+  assert.equal(c.proof.ready, true);
+  assert.equal(c.status.key, "resolved");
+  assert.equal(c.proof.checks.filter((x) => x.passed).length, 4);
+  assert.equal(c.callerNotes.pharmacyName, "CVS");
+  assert.equal(c.callerNotes.medicationHint, "metformin");
+  assert.equal(new Set(replies.map((r) => r.toLowerCase())).size, replies.length, "acks must be distinct");
+  for (const reply of replies) {
+    assert.doesNotMatch(reply, /what'?s going on/i, `looping-IVR question leaked: ${reply}`);
+    assert.match(reply, /\bI['’](ve|m)\b/, `ack must be first-person doing-work: ${reply}`);
+  }
+  assert.match(replies[3], /today|same-day/i, "final ack must state pickup timing");
+  assert.match(replies[3], /update/i, "final ack must confirm the patient update");
+});
+
+test("missed middle turns cannot dead-end the case (chain backfill)", async () => {
+  const store = new CaseStore({ telephony: new DemoTelephonyAdapter(), seedDemo: false });
+  const skipBoth = store.openVoiceCase({ callId: "skip-both", from: "+15550009998" });
+  await store.handleVoiceTurn({ caseId: skipBoth.id, transcript: "Please help — I've been stuck at CVS on my metformin.", asrConfidence: 0.9 });
+  const ready = await store.handleVoiceTurn({ caseId: skipBoth.id, transcript: "It's ready for pickup.", asrConfidence: 0.9 });
+  assert.equal(ready.action, "pharmacy_ready");
+  assert.equal(ready.case.proof.ready, true);
+
+  const skipBlocker = store.openVoiceCase({ callId: "skip-blocker", from: "+15550009997" });
+  await store.handleVoiceTurn({ caseId: skipBlocker.id, transcript: "Please help — I've been stuck at CVS on my metformin.", asrConfidence: 0.9 });
+  const clinic = await store.handleVoiceTurn({ caseId: skipBlocker.id, transcript: "My doctor filed the PA.", asrConfidence: 0.9 });
+  assert.equal(clinic.action, "clinic_submission");
+  assert.ok(store.get(skipBlocker.id).pharmacy.blocker, "clinic filing implies the PA blocker");
+});
+
+test("no-input prompts rotate, content-bearing speech survives modest confidence", async () => {
+  const { noInputPrompt, isUsableSpeech, enforceMemoryGuards } = await import("../src/dialogue.mjs");
+  assert.notEqual(noInputPrompt(0), noInputPrompt(1));
+  assert.notEqual(noInputPrompt(1), noInputPrompt(2));
+  for (const attempt of [0, 1, 2]) assert.doesNotMatch(noInputPrompt(attempt), /what'?s going on/i);
+  assert.equal(isUsableSpeech("It's ready for pickup.", 0.3).ok, true);
+  assert.equal(isUsableSpeech("They need prior authorization.", 0.32).ok, true);
+  const guarded = enforceMemoryGuards("Thanks. What's going on with the prescription?", {
+    consented: true,
+    statusKey: "coordinating",
+    conversationTurns: [],
+    askedStatusQuestions: {},
+  });
+  assert.doesNotMatch(guarded, /what'?s going on/i);
+  assert.match(guarded, /pharmacy/i);
+});
+
 test("Alex natural path still reaches proof 4/4 with memory-safe replies", async () => {
   const store = new CaseStore({ telephony: new DemoTelephonyAdapter(), seedDemo: false });
   const opened = store.openVoiceCase({ callId: "alex-demo", from: "+15550005555" });

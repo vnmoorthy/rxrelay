@@ -16,7 +16,8 @@ Response rules:
 6. Never end with "Is there anything else I can help you with?"
 7. Never re-ask for consent or permission once Case context says consent=true.
 8. Never re-ask the same status question you already asked in Your previous spoken lines.
-9. Mirror the tone of the few-shot examples: warm, concrete, human.
+9. Never ask "what's going on with the prescription" (or similar) — the call opener already asked that. Ask only about the NEXT missing fact for the case status.
+10. Mirror the tone of the few-shot examples: warm, concrete, human. Prefer first-person action language ("I've recorded…", "I'm checking…") over interviewing.
 
 Truth rules — non-negotiable:
 - Never claim you searched, called, texted, or completed an action unless System action just completed says so.
@@ -102,8 +103,10 @@ export class PavoInferenceEngine {
     lastAssistantReplies = [],
     scriptedFallback = "",
   }) {
-    const fallback = scriptedFallback
-      || scriptedVoiceReply(route, { consentRecorded, statusKey });
+    // Safety stops always speak the safety script, never a conversational ack.
+    const fallback = route.tier === "safe_stop"
+      ? scriptedVoiceReply(route, { consentRecorded, statusKey })
+      : (scriptedFallback || scriptedVoiceReply(route, { consentRecorded, statusKey }));
     if (!this.configuredFor(route)) {
       return { text: fallback, source: "local-safe-fallback", model: null, pipeline: TIER_LABELS[route.tier] };
     }

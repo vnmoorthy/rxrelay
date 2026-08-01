@@ -344,6 +344,8 @@ export class CaseStore {
       const canAct = (previouslyConsented || consentRecorded) && !record.humanReview;
       if (canAct) {
         try {
+          // Each demo beat backfills any missed earlier step so a dropped ASR
+          // turn never dead-ends the case (caller reports are the evidence).
           if (intent === "pharmacy_blocker" && !record.pharmacy.blocker) {
             if (!record.coordinationStarted) await this.beginCoordinationUnlocked(caseId);
             const blocker = /insurance/i.test(spoken) ? "Insurance / prior authorization hold" : "Prior authorization needed";
@@ -355,11 +357,19 @@ export class CaseStore {
           ) {
             await this.beginCoordinationUnlocked(caseId);
             action = "start_coordination";
-          } else if (intent === "clinic_submission" && record.pharmacy.blocker && !record.clinic.submissionRecorded) {
-            this.recordClinicSubmissionUnlocked(caseId);
+          } else if (intent === "clinic_submission" && !record.clinic.submissionRecorded) {
+            if (!record.coordinationStarted) await this.beginCoordinationUnlocked(caseId);
+            if (!record.pharmacy.blocker) {
+              this.recordPharmacyBlockerUnlocked(caseId, { blocker: "Prior authorization needed (implied by clinic filing)" });
+            }
+            this.recordClinicSubmissionUnlocked(caseId, { reference: "PA-CALLER" });
             action = "clinic_submission";
-          } else if (intent === "pharmacy_ready" && record.clinic.submissionRecorded && !record.pharmacy.readyForPickup) {
-            await this.recordPharmacyReadyUnlocked(caseId);
+          } else if (intent === "pharmacy_ready" && !record.pharmacy.readyForPickup) {
+            if (!record.coordinationStarted) await this.beginCoordinationUnlocked(caseId);
+            if (record.pharmacy.blocker && !record.clinic.submissionRecorded) {
+              this.recordClinicSubmissionUnlocked(caseId, { reference: "PA-CALLER" });
+            }
+            await this.recordPharmacyReadyUnlocked(caseId, { skipChainGuard: true });
             action = "pharmacy_ready";
           } else if (intent === "escalate") {
             record.humanReview = true;
@@ -392,6 +402,9 @@ export class CaseStore {
         askedStatusQuestions: record.askedStatusQuestions,
       });
 
+      // Action turns speak the deterministic scripted ack: Maya just DID the
+      // work, so she says so immediately — no LLM latency, no open re-asks.
+      const preferScriptedAck = ["consent", "start_coordination", "pharmacy_blocker", "clinic_submission", "pharmacy_ready", "escalate"].includes(actionLabel);
       const result = await this.inboundTurnUnlocked({
         caseId,
         transcript: spoken,
@@ -406,12 +419,13 @@ export class CaseStore {
         lastAssistantReply: lastAssistant,
         lastAssistantReplies: priorAssistant,
         scriptedFallback: fallback,
+        skipInference: preferScriptedAck,
       });
 
       let reply = fallback;
       if (result.route.tier === "safe_stop") {
         reply = result.reply;
-      } else if (result.inference?.source === "openai-compatible" && result.reply) {
+      } else if (!preferScriptedAck && result.inference?.source === "openai-compatible" && result.reply) {
         reply = result.reply;
       }
       reply = enforceMemoryGuards(reply, {
@@ -547,15 +561,17 @@ export class CaseStore {
     return this.mutateAsync(async () => this.recordPharmacyReadyUnlocked(id));
   }
 
-  async recordPharmacyReadyUnlocked(id, { attestedBy = "voice_or_dashboard", token = null } = {}) {
+  async recordPharmacyReadyUnlocked(id, { attestedBy = "voice_or_dashboard", token = null, skipChainGuard = false } = {}) {
     const record = this.cases.get(id);
     if (!record) throw new Error(`Case ${id} was not found.`);
     this.requireConsent(record);
-    if (!record.clinic.submissionRecorded) throw new Error("Record the clinic follow-up before confirming pharmacy readiness.");
+    // Voice turns may skip the clinic-step guard: the caller's own report of
+    // readiness is the counterpart outcome, even if a middle turn was missed.
+    if (!record.clinic.submissionRecorded && !skipChainGuard) throw new Error("Record the clinic follow-up before confirming pharmacy readiness.");
     record.pharmacy.readyForPickup = true;
     record.evidence.counterpartOutcomeRecorded = true;
     this.addEvent(record, "pharmacy_ready", "Pharmacy confirmed the prescription is ready for pickup.", "pharmacy", { attestedBy, token });
-    return this.sendPatientUpdateUnlocked(id, "Your pharmacy confirmed your prescription is ready for pickup. Please contact the pharmacy directly for pickup details.", "resolution_update");
+    return this.sendPatientUpdateUnlocked(id, "Your pharmacy confirmed your prescription is ready for pickup — same-day pickup is typically available. Contact the pharmacy for the exact window.", "resolution_update");
   }
 
   async sendPatientUpdate(id, text, reason = "status_update") {
@@ -606,6 +622,7 @@ export class CaseStore {
     lastAssistantReply = "",
     lastAssistantReplies = [],
     scriptedFallback = "",
+    skipInference = false,
   }) {
     const record = this.cases.get(caseId);
     if (!record) throw new Error(`Case ${caseId} was not found.`);
@@ -619,7 +636,9 @@ export class CaseStore {
     });
     record.lastRoute = route;
     const statusKey = deriveStatus(record).key;
-    const inference = await this.inference.respond({
+    const inference = (skipInference && route.tier !== "safe_stop" && scriptedFallback)
+      ? { text: scriptedFallback, source: "scripted-action", model: null, pipeline: TIER_LABELS[route.tier] }
+      : await this.inference.respond({
       transcript,
       route,
       consentRecorded: record.evidence.consentRecorded,

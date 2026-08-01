@@ -35,33 +35,37 @@ export const STATUS_QUESTION_PATTERNS = {
   ask_consent: /want me to (help|check|start)|say (you want|yes)|pharmacy status check/i,
 };
 
-/** Rotating short scripts keyed by action / status. */
+/**
+ * Rotating short scripts keyed by action / status.
+ * Action acks are first-person "I've done X / I'm doing Y" — Maya just DID
+ * the work, so she says so and asks one forward-moving question.
+ * ctx.pharmacy is a suffix like " at CVS"; ctx.pharmacyName is the bare name.
+ */
 export const SCRIPT_VARIANTS = {
   consent: [
-    (ctx) => `Thanks — I've got your okay for status follow-up. Your case is ${ctx.caseId}. What's going on with the${ctx.med} prescription${ctx.pharmacy}?`,
-    (ctx) => `Consent noted for ${ctx.caseId}. Tell me about the${ctx.med} situation${ctx.pharmacy}.`,
-    (ctx) => `You're covered for status help — case ${ctx.caseId}. What should I know about the${ctx.med} Rx${ctx.pharmacy}?`,
+    (ctx) => `Thanks — I've recorded your okay and opened case ${ctx.caseId}. What has ${ctx.pharmacyName || "the pharmacy"} told you so far?`,
+    (ctx) => `You're covered — consent is on file for ${ctx.caseId}. What did ${ctx.pharmacyName || "the pharmacy"} say?`,
+    (ctx) => `Consent noted for ${ctx.caseId}. What's the latest from ${ctx.pharmacyName || "the pharmacy"}?`,
   ],
   start_coordination: [
-    (ctx) => exemplarReplyFor("start_coordination")
-      || `Okay, I've started a pharmacy status check${ctx.pharmacy}. When you hear back, tell me what they said — PA hold, insurance, or ready.`,
-    (ctx) => `On it — coordinating${ctx.pharmacy} now. What did they say is holding things up?`,
-    (ctx) => `Status check started${ctx.pharmacy}. Prior auth, insurance, or ready for pickup — whichever they told you.`,
+    (ctx) => `Got it — I've got your okay and I'm checking status with ${ctx.pharmacyName || "the pharmacy"}${ctx.med ? ` on your${ctx.med}` : ""} now. What did they tell you?`,
+    (ctx) => `On it — I've opened your case and I'm on the${ctx.pharmacy} status now. What did they say is holding it up?`,
+    (ctx) => `I'm checking with ${ctx.pharmacyName || "the pharmacy"} right now. Prior auth, insurance, or ready — whichever they told you.`,
   ],
   pharmacy_blocker: [
-    () => exemplarReplyFor("pharmacy_blocker") || "Got it — prior authorization is on the record. Tell me when your doctor or clinic files it.",
-    () => "PA hold recorded. Has your clinic submitted it yet, or still waiting?",
-    () => "Understood — they're waiting on prior auth. Ping me when the doctor's office files it.",
+    (ctx) => `I've logged that ${ctx.pharmacyName || "the pharmacy"} needs prior auth, and noted we're waiting on your clinic. Has your doctor filed it yet?`,
+    () => "PA hold is on the record — I've marked us waiting on your clinic. Has your doctor filed it yet?",
+    () => "I've recorded the prior auth hold. Tell me the moment your doctor's office files it.",
   ],
   clinic_submission: [
-    () => exemplarReplyFor("clinic_submission") || "Thanks — clinic submission is recorded. Let me know when the pharmacy says it's ready for pickup.",
-    () => "Clinic filing noted. Has the pharmacy confirmed ready yet?",
-    () => "Got the clinic step. Tell me when they say you can pick it up.",
+    () => "Perfect — I've recorded that the clinic filed the PA, and I'm pushing it back to the pharmacy for fill confirmation. Tell me when they say it's ready.",
+    (ctx) => `Clinic filing recorded. I'm following up with ${ctx.pharmacyName || "the pharmacy"} for fill confirmation — tell me when they say it's ready.`,
+    () => "I've logged the clinic's PA submission and flagged the pharmacy for fill confirmation. Let me know when it's ready.",
   ],
   pharmacy_ready: [
-    () => exemplarReplyFor("pharmacy_ready") || "Great news — readiness is recorded and I sent your status update. Anything else before we wrap up?",
-    () => "You're all set — ready for pickup is confirmed and your update went out.",
-    () => "Confirmed ready. Status update sent. You can hang up whenever you're done.",
+    (ctx) => `Great news — I've confirmed it's ready for pickup and sent your status update. You can pick it up${ctx.pharmacy || " at the pharmacy"} today — call them for the exact window. You're all set.`,
+    (ctx) => `I've marked it ready and your text update just went out. Same-day pickup${ctx.pharmacy} — call them for the exact window. You're all set.`,
+    () => "Done — pickup readiness is confirmed and your status update is sent. It's usually same-day once marked ready. You're all set.",
   ],
   vent: [
     () => exemplarReplyFor("vent") || "I hear you — that runaround is exhausting. What's the latest from the pharmacy?",
