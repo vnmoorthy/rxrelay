@@ -237,15 +237,15 @@ export function scriptedVoiceReply(route, { consentRecorded = false, statusKey =
     return "I want to get the details right. I’ll confirm the pharmacy status and keep your case open until there is evidence of the next step.";
   }
   if (!consentRecorded) {
-    return "I can coordinate a prescription-access status follow-up. Please say: I consent to a pharmacy status follow-up and text updates.";
+    return "I can chase pharmacy status for you — just say you want a pharmacy status check and I’ll take it from there.";
   }
   if (statusKey === "ready" || statusKey === "intake") {
-    return "Consent is on the record. Say check my prescription status and I will start a permitted pharmacy follow-up.";
+    return "Want me to start a pharmacy status check now?";
   }
   if (route.tier === "balanced") {
     return "I’m coordinating your status follow-up and will only mark progress when counterpart evidence is recorded.";
   }
-  return "I’m here for your prescription-access case. What status update should I pursue next?";
+  return "I’m here for your prescription-access case. What’s the latest update?";
 }
 
 /** Lightweight intent tags used by the voice case engine after consent. */

@@ -14,7 +14,7 @@
     "confirm": "node --env-file-if-exists=.env scripts/confirm-number.mjs",
     "deck": "node deck/build-deck.mjs",
     "test": "node --test",
-    "check": "node --check server.mjs && node --check voice-server.mjs && node --check src/pavo.mjs && node --check src/inference.mjs && node --check src/store.mjs && node --check src/telephony.mjs && node --check src/persist.mjs && node --check src/bus.mjs && node --check src/dialogue.mjs && node --check src/receipt.mjs && node --check src/counterpart.mjs && node --check scripts/live-inbound.mjs && node --check scripts/point-number.mjs && node --check scripts/verify-number.mjs && node --check scripts/confirm-number.mjs && node --check public/app.js && node --check deck/build-deck.mjs"
+    "check": "node --check server.mjs && node --check voice-server.mjs && node --check src/pavo.mjs && node --check src/inference.mjs && node --check src/store.mjs && node --check src/telephony.mjs && node --check src/persist.mjs && node --check src/bus.mjs && node --check src/dialogue.mjs && node --check src/voice-lexicon.mjs && node --check src/voice-training/index.mjs && node --check src/receipt.mjs && node --check src/counterpart.mjs && node --check scripts/live-inbound.mjs && node --check scripts/point-number.mjs && node --check scripts/verify-number.mjs && node --check scripts/confirm-number.mjs && node --check public/app.js && node --check deck/build-deck.mjs"
   },
   "engines": {
     "node": ">=20"

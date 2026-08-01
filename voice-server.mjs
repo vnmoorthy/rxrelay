@@ -4,6 +4,7 @@ import { JsonCasePersistence } from "./src/persist.mjs";
 import { createTelephonyAdapter } from "./src/telephony.mjs";
 import { TIER_LABELS } from "./src/pavo.mjs";
 import { openPrompt, noInputPrompt, sayVoiceAttrs } from "./src/dialogue.mjs";
+import { gatherSpeechHintsAttr } from "./src/voice-training/index.mjs";
 
 const store = new CaseStore({
   telephony: createTelephonyAdapter(),
@@ -72,7 +73,8 @@ function say(text) {
  */
 function gather(prompt, action, { verified = false } = {}) {
   const input = verified ? "speech dtmf" : "speech";
-  const hints = ' hints="consent, help with my prescription, pharmacy status, prior authorization, clinic submitted, ready for pickup, CVS, Walgreens, human"';
+  // Stronger STT bias from mined lexicon (Alex/CVS/metformin + PA/clinic/ready phrases).
+  const hints = gatherSpeechHintsAttr(24);
   const numDigits = verified ? ' numDigits="8"' : "";
   return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="8" speechTimeout="auto" language="en-US" profanityFilter="false"${numDigits}${hints}>${say(prompt)}</Gather><Redirect method="POST">${xmlEscape(action)}</Redirect>`;
 }

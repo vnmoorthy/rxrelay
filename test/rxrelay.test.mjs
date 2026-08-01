@@ -307,11 +307,70 @@ test("ASR repairs and avoid-repeat keep phone turns clean", async () => {
   const { normalizeTranscript, avoidRepeat } = await import("../src/dialogue.mjs");
   assert.match(normalizeTranscript("they need prior off before they can fill it"), /prior auth/i);
   assert.match(normalizeTranscript("I'm stuck at see vs pharmacy"), /CVS/i);
+  assert.match(normalizeTranscript("wall greens needs pryor auth for my met for min"), /Walgreens.*prior auth.*metformin/i);
+  assert.match(normalizeTranscript("cbs pharmacy said ready to pick up"), /CVS.*ready for pickup/i);
   const repeated = avoidRepeat(
     "I'm listening. Learn what they need.",
     [{ role: "assistant", text: "I'm listening. Learn what they need." }],
   );
   assert.notEqual(repeated, "I'm listening. Learn what they need.");
+  const nearDup = avoidRepeat(
+    "Got it — prior authorization is on the record. Tell me when your doctor files it.",
+    [{ role: "assistant", text: "Got it — prior authorization is on the record. Tell me when your doctor or clinic files it." }],
+  );
+  assert.doesNotMatch(nearDup, /prior authorization is on the record/i);
+});
+
+test("voice lexicon expands paraphrases for intent and consent", async () => {
+  const { detectConversationalIntent, consentFromTranscript } = await import("../src/dialogue.mjs");
+  const { lexiconMeta, gatherSpeechHintsAttr, fewShotPromptBlock } = await import("../src/voice-training/index.mjs");
+  const meta = lexiconMeta();
+  assert.ok(meta.exemplarCount >= 8);
+  assert.ok(meta.speechHintCount >= 10);
+  assert.match(gatherSpeechHintsAttr(), /metformin/i);
+  assert.match(fewShotPromptBlock(), /Maya:/);
+
+  assert.equal(detectConversationalIntent("Insurance is holding it and they won't fill"), "pharmacy_blocker");
+  assert.equal(detectConversationalIntent("Doc took care of it this morning", "waiting_clinic"), "clinic_submission");
+  assert.equal(detectConversationalIntent("Filled and ready at the pharmacy", "waiting_pharmacy"), "pharmacy_ready");
+  assert.equal(detectConversationalIntent("Get me a human please"), "escalate");
+  assert.equal(detectConversationalIntent("I'm exhausted and sick of calling"), "vent");
+  assert.equal(consentFromTranscript("Could you look into my refill at Walgreens?").granted, true);
+  assert.equal(consentFromTranscript("I've been stuck with Costco pharmacy and need my meds").granted, true);
+});
+
+test("paraphrase path still hits 4/4 proof without legalese", async () => {
+  const store = new CaseStore({ telephony: new DemoTelephonyAdapter(), seedDemo: false });
+  const opened = store.openVoiceCase({ callId: "lexicon-e2e", from: "+15550008888" });
+  await store.handleVoiceTurn({
+    caseId: opened.id,
+    transcript: "Can you check what's going on with my prescription at see vs? It's metformin.",
+    asrConfidence: 0.93,
+  });
+  assert.equal(store.get(opened.id).evidence.consentRecorded, true);
+  await store.handleVoiceTurn({
+    caseId: opened.id,
+    transcript: "They're waiting on insurance / PA.",
+    asrConfidence: 0.92,
+  });
+  assert.ok(store.get(opened.id).pharmacy.blocker);
+  await store.handleVoiceTurn({
+    caseId: opened.id,
+    transcript: "The clinic submitted it.",
+    asrConfidence: 0.94,
+  });
+  assert.equal(store.get(opened.id).clinic.submissionRecorded, true);
+  const ready = await store.handleVoiceTurn({
+    caseId: opened.id,
+    transcript: "It's ready.",
+    asrConfidence: 0.95,
+  });
+  assert.equal(store.get(opened.id).status.key, "resolved");
+  assert.equal(store.get(opened.id).proof.ready, true);
+  const replies = store.get(opened.id).conversationTurns.filter((t) => t.role === "assistant").map((t) => t.text);
+  const unique = new Set(replies.map((r) => r.toLowerCase()));
+  assert.equal(unique.size, replies.length, "assistant should not repeat identical lines");
+  assert.ok(ready.reply.length < 220);
 });
 
 test("natural patient story completes proof without legalese consent", async () => {
@@ -363,6 +422,35 @@ test("PAVO exposes tasteful user-facing route labels", () => {
   const safe = routeTurn({ transcript: "I have chest pain and difficulty breathing" });
   assert.equal(safe.tier, "safe_stop");
   assert.equal(safe.userFacingLabel, "Safety handoff");
+});
+
+test("memory guards block consent re-asks and duplicate status questions", async () => {
+  const { enforceMemoryGuards, markAskedStatusQuestion, lastAssistantLines } = await import("../src/dialogue.mjs");
+  const asked = markAskedStatusQuestion("Want me to start a pharmacy status check now?", "ready", {});
+  assert.equal(asked.ready, true);
+  const again = enforceMemoryGuards("Want me to start a pharmacy status check now?", {
+    consented: true,
+    statusKey: "ready",
+    conversationTurns: [{ role: "assistant", text: "Want me to start a pharmacy status check now?" }],
+    askedStatusQuestions: asked,
+  });
+  assert.doesNotMatch(again, /want me to start a pharmacy status check now/i);
+  const noConsentAgain = enforceMemoryGuards("Please say: I consent to a pharmacy status follow-up.", {
+    consented: true,
+    statusKey: "coordinating",
+    conversationTurns: [],
+    askedStatusQuestions: {},
+  });
+  assert.doesNotMatch(noConsentAgain, /i consent/i);
+  assert.deepEqual(
+    lastAssistantLines([
+      { role: "user", text: "hi" },
+      { role: "assistant", text: "one" },
+      { role: "assistant", text: "two" },
+      { role: "assistant", text: "three" },
+    ], 2),
+    ["two", "three"],
+  );
 });
 
 test("forget session clears conversation memory", async () => {

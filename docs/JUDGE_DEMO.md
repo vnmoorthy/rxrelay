@@ -17,6 +17,8 @@ npm run dev
 npm run live:inbound
 ```
 
+Maya uses a practical voice-training layer (`src/voice-training/lexicon.json`): ASR repairs, Gather speech hints, intent/consent paraphrases, anti-repeat memory, and few-shot exemplar turns in the LLM prompt. Speak naturally — she should not need legalese.
+
 ---
 
 ## Patient scenario (memorize this character)
@@ -42,15 +44,16 @@ Maya should sound human: short answers, no menu dumps, no repeating herself.
 
 | Beat | Say something like… | Board should… |
 | --- | --- | --- |
-| 1 · Ask for help | “Hi — please help, I’ve been stuck at CVS for five days on my metformin.” | New voice case · consent green |
-| 2 · Pharmacy blocker | “They said they need prior authorization before they can fill it.” | Coordination + PA blocker |
+| 1 · Ask for help | “Hi — please help, I’ve been stuck at CVS for five days on my metformin.” | New voice case · consent green · coordination starts |
+| 2 · Pharmacy blocker | “They said they need prior auth before they can fill it.” | Coordination + PA blocker |
 | 3 · Clinic filed | “My doctor filed the PA this morning.” | Clinic submission |
 | 4 · Ready | “The pharmacy says it’s ready for pickup.” | **4/4 green** · resolved |
 
-**Also fine** (same beats):
+**Also fine** (same beats — lexicon covers these paraphrases):
 - “Can you check what’s going on with my prescription?”
-- “They’re waiting on insurance / PA.”
-- “The clinic submitted it.” / “It’s ready.”
+- “They’re waiting on insurance / PA.” / “Insurance is holding it.”
+- “The clinic submitted it.” / “Doc took care of it.”
+- “It’s ready.” / “Filled and ready.”
 - “I want a human.” → safety handoff
 
 You do **not** need to recite “I consent to a pharmacy status follow-up…” — asking for help with the Rx is enough for the demo path.
@@ -70,7 +73,7 @@ You do **not** need to recite “I consent to a pharmacy status follow-up…” 
 | Issue | Fix |
 | --- | --- |
 | Silence / “didn’t catch that” | Speak a bit slower; wait for the tone to end |
-| Maya repeats herself | Hang up, call again (new case); stack was updated to anti-repeat |
+| Maya repeats herself | Hang up, call again (new case); anti-repeat + few-shot style are wired in |
 | Board doesn’t move | Refresh case picker; confirm shared `data/cases.json` |
 | Wrong number / no answer | Re-run `npm run live:inbound` (tunnel URL changes) |
 
@@ -78,9 +81,9 @@ You do **not** need to recite “I consent to a pharmacy status follow-up…” 
 
 ## Soft phrases cheat-sheet
 
-- Help / consent: “please help with my prescription”, “you can check my pharmacy status”
+- Help / consent: “please help with my prescription”, “you can check my pharmacy status”, “I’ve been stuck at CVS…”
 - Start: “what’s going on with my meds?”, “I’ve been waiting”
-- PA: “they need prior auth”, “insurance is holding it”
-- Clinic: “my doctor filed it”, “clinic submitted the PA”
-- Ready: “it’s ready for pickup”
+- PA: “they need prior auth”, “insurance is holding it”, “won’t fill until PA”
+- Clinic: “my doctor filed it”, “clinic submitted the PA”, “doc took care of it”
+- Ready: “it’s ready for pickup”, “filled and ready”
 - Human: “I want a real person”

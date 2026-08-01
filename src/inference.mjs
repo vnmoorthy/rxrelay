@@ -1,5 +1,7 @@
 import { scriptedVoiceReply, TIER_LABELS } from "./pavo.mjs";
 import { goalForStatus } from "./dialogue.mjs";
+import { formatFewShotBlock } from "./voice-lexicon.mjs";
+// formatFewShotBlock pulls mined exemplars from src/voice-training/lexicon.json
 
 const SYSTEM_PROMPT = `You are Maya at RxRelay — a calm phone coordinator for prescription-access status. You also answer ordinary non-clinical questions briefly when asked.
 
@@ -11,6 +13,9 @@ Response rules (strict):
 3. Ask at most one question, and only if you need a fact to advance the case.
 4. Never recite menus, legal disclaimers, or "I understand" filler.
 5. Never end with "Is there anything else I can help you with?"
+6. Never re-ask for consent or permission once Case context says consent=true.
+7. Never re-ask the same status question you already asked in Your previous spoken lines.
+8. Mirror the tone of the few-shot examples: warm, brief, concrete.
 
 Truth rules — non-negotiable:
 - Never claim you searched, called, texted, or completed an action unless System action just completed says so.
@@ -18,7 +23,10 @@ Truth rules — non-negotiable:
 - No diagnosis, dosing, prescribing, Rx changes, or inventory answers.
 - Urgent symptoms / self-harm: urge emergency services briefly; stop automation.
 
-When they describe being stuck on a prescription after consent, help move the status trail (check → PA → clinic filed → ready) using only facts they provide.`;
+When they describe being stuck on a prescription after consent, help move the status trail (check → PA → clinic filed → ready) using only facts they provide.
+
+Ideal phone style (few-shot — match this brevity):
+${formatFewShotBlock()}`;
 
 function responseText(payload) {
   if (typeof payload.output_text === "string" && payload.output_text.trim()) return payload.output_text.trim();
@@ -75,6 +83,7 @@ export class PavoInferenceEngine {
     intent = "chat",
     callerNotes = {},
     lastAssistantReply = "",
+    lastAssistantReplies = [],
     scriptedFallback = "",
   }) {
     const fallback = scriptedFallback
@@ -86,19 +95,24 @@ export class PavoInferenceEngine {
     const labels = TIER_LABELS[route.tier] || TIER_LABELS.fast;
     const demand = route.signals?.demand ?? null;
     const goal = dialogueHint || goalForStatus(statusKey, { consented: consentRecorded });
+    const priorLines = (lastAssistantReplies?.length
+      ? lastAssistantReplies
+      : (lastAssistantReply ? [lastAssistantReply] : [])
+    ).filter(Boolean);
     const input = [
       SYSTEM_PROMPT,
       "",
       `Case context: ${caseBrief}`,
+      `Consent already recorded: ${consentRecorded ? "YES — never ask for consent again" : "no"}`,
       `Detected intent: ${intent}`,
       actionTaken
         ? `System action just completed with evidence: ${actionTaken}. Acknowledge once, briefly. Do not invent other completed actions.`
         : "No tool execution this turn — do not claim outreach happened.",
       `Caller notes: ${JSON.stringify(callerNotes || {})}`,
       `Internal goal (do not recite verbatim): ${goal}`,
-      lastAssistantReply
-        ? `Your previous spoken line (do NOT repeat or paraphrase): ${lastAssistantReply}`
-        : "Your previous spoken line: (none)",
+      priorLines.length
+        ? `Your previous spoken lines (do NOT repeat, paraphrase, or re-ask the same question):\n${priorLines.map((line, i) => `${i + 1}. ${line}`).join("\n")}`
+        : "Your previous spoken lines: (none)",
       conversationDigest ? `Recent conversation:\n${conversationDigest}` : "Recent conversation: (start of call)",
       `Caller just said: ${transcript}`,
       `PAVO: tier=${route.tier}; demand=${demand}`,

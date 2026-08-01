@@ -14,7 +14,10 @@ import {
   recentTranscriptDigest,
   normalizeTranscript,
   avoidRepeat,
+  enforceMemoryGuards,
+  markAskedStatusQuestion,
   lastSpokenLine,
+  lastAssistantLines,
 } from "./dialogue.mjs";
 
 const now = () => new Date().toISOString();
@@ -311,6 +314,7 @@ export class CaseStore {
       if (!record) throw new Error(`Case ${caseId} was not found.`);
       if (!record.conversationTurns) record.conversationTurns = [];
       if (!record.callerNotes) record.callerNotes = {};
+      if (!record.askedStatusQuestions) record.askedStatusQuestions = {};
 
       const spoken = normalizeTranscript(transcript);
       const previouslyConsented = record.evidence.consentRecorded;
@@ -374,6 +378,7 @@ export class CaseStore {
       const actionLabel = consentRecorded && !action ? "consent" : action;
       const digest = recentTranscriptDigest(record.conversationTurns);
       const lastAssistant = lastSpokenLine(record.conversationTurns);
+      const priorAssistant = lastAssistantLines(record.conversationTurns, 2);
       const statusForReply = deriveStatus(record).key;
       const fallback = scriptedConversationalReply({
         statusKey: statusForReply,
@@ -384,6 +389,7 @@ export class CaseStore {
         humanReview: record.humanReview,
         notes: record.callerNotes,
         conversationTurns: record.conversationTurns,
+        askedStatusQuestions: record.askedStatusQuestions,
       });
 
       const result = await this.inboundTurnUnlocked({
@@ -398,6 +404,7 @@ export class CaseStore {
         intent,
         callerNotes: record.callerNotes,
         lastAssistantReply: lastAssistant,
+        lastAssistantReplies: priorAssistant,
         scriptedFallback: fallback,
       });
 
@@ -407,7 +414,14 @@ export class CaseStore {
       } else if (result.inference?.source === "openai-compatible" && result.reply) {
         reply = result.reply;
       }
+      reply = enforceMemoryGuards(reply, {
+        consented: record.evidence.consentRecorded,
+        statusKey: statusForReply,
+        conversationTurns: record.conversationTurns,
+        askedStatusQuestions: record.askedStatusQuestions,
+      });
       reply = avoidRepeat(reply, record.conversationTurns);
+      record.askedStatusQuestions = markAskedStatusQuestion(reply, statusForReply, record.askedStatusQuestions);
 
       record.conversationTurns.push({ role: "user", text: spoken, at: now(), intent, action: actionLabel });
       record.conversationTurns.push({ role: "assistant", text: reply, at: now() });
@@ -590,6 +604,7 @@ export class CaseStore {
     intent = "chat",
     callerNotes = {},
     lastAssistantReply = "",
+    lastAssistantReplies = [],
     scriptedFallback = "",
   }) {
     const record = this.cases.get(caseId);
@@ -615,8 +630,11 @@ export class CaseStore {
       intent,
       callerNotes,
       lastAssistantReply,
+      lastAssistantReplies: lastAssistantReplies.length
+        ? lastAssistantReplies
+        : (lastAssistantReply ? [lastAssistantReply] : []),
       scriptedFallback,
-      caseBrief: `Case ${caseId}; consent=${record.evidence.consentRecorded}; status=${statusKey}; medication=${record.medication}; coordinationStarted=${record.coordinationStarted}; pharmacyBlocker=${record.pharmacy.blocker || "none"}; clinicSubmitted=${record.clinic.submissionRecorded}; ready=${record.pharmacy.readyForPickup}; proof=${JSON.stringify(record.evidence)}; notes=${JSON.stringify(record.callerNotes || {})}.`,
+      caseBrief: `Case ${caseId}; consent=${record.evidence.consentRecorded}; status=${statusKey}; medication=${record.medication}; coordinationStarted=${record.coordinationStarted}; pharmacyBlocker=${record.pharmacy.blocker || "none"}; clinicSubmitted=${record.clinic.submissionRecorded}; ready=${record.pharmacy.readyForPickup}; proof=${JSON.stringify(record.evidence)}; notes=${JSON.stringify(record.callerNotes || {})}; asked=${JSON.stringify(record.askedStatusQuestions || {})}.`,
     });
     this.addEvent(record, "voice_turn", inference.text, "patient", {
       transcript,

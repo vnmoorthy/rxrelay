@@ -1,0 +1,508 @@
+{
+  "version": 1,
+  "source": "Mined from cases.json conversationTurns, JUDGE_DEMO, README/DEMO scripts, dialogue fallbacks, plus curated pharmacy-status phone paraphrases (offline-friendly; no HF download required). Shipped at src/voice-training/lexicon.json.",
+  "speechHints": [
+    "please help with my prescription",
+    "I've been stuck at CVS",
+    "stuck at Walgreens",
+    "metformin",
+    "pharmacy status",
+    "prior authorization",
+    "prior auth",
+    "they need prior auth",
+    "insurance is holding it",
+    "clinic submitted",
+    "my doctor filed the PA",
+    "ready for pickup",
+    "it's ready",
+    "I consent",
+    "you can check my pharmacy status",
+    "I want a human",
+    "real person",
+    "still waiting",
+    "nothing yet",
+    "CVS",
+    "Walgreens",
+    "Rite Aid",
+    "Costco",
+    "Walmart"
+  ],
+  "asrRepairs": [
+    [
+      "ready to pick up",
+      "ready for pickup"
+    ],
+    [
+      "ready for pick up",
+      "ready for pickup"
+    ],
+    [
+      "ready to pickup",
+      "ready for pickup"
+    ],
+    [
+      "prior off",
+      "prior auth"
+    ],
+    [
+      "prior of",
+      "prior auth"
+    ],
+    [
+      "pryor auth",
+      "prior auth"
+    ],
+    [
+      "pryer auth",
+      "prior auth"
+    ],
+    [
+      "fryer auth",
+      "prior auth"
+    ],
+    [
+      "priority authorization",
+      "prior authorization"
+    ],
+    [
+      "prior authorisation",
+      "prior authorization"
+    ],
+    [
+      "p a needed",
+      "PA needed"
+    ],
+    [
+      "pee ay",
+      "PA"
+    ],
+    [
+      "see vs",
+      "CVS"
+    ],
+    [
+      "c v s",
+      "CVS"
+    ],
+    [
+      "cbs pharmacy",
+      "CVS pharmacy"
+    ],
+    [
+      "c.v.s",
+      "CVS"
+    ],
+    [
+      "wall greens",
+      "Walgreens"
+    ],
+    [
+      "wal greens",
+      "Walgreens"
+    ],
+    [
+      "wallgreens",
+      "Walgreens"
+    ],
+    [
+      "walgreen's",
+      "Walgreens"
+    ],
+    [
+      "right aid",
+      "Rite Aid"
+    ],
+    [
+      "rite aide",
+      "Rite Aid"
+    ],
+    [
+      "cost co",
+      "Costco"
+    ],
+    [
+      "wall mart",
+      "Walmart"
+    ],
+    [
+      "wal mart",
+      "Walmart"
+    ],
+    [
+      "met for men",
+      "metformin"
+    ],
+    [
+      "met for min",
+      "metformin"
+    ],
+    [
+      "med for men",
+      "metformin"
+    ],
+    [
+      "pick-up",
+      "pickup"
+    ],
+    [
+      "pick up",
+      "pickup"
+    ],
+    [
+      "i consent",
+      "I consent"
+    ],
+    [
+      "eye consent",
+      "I consent"
+    ],
+    [
+      "high consent",
+      "I consent"
+    ],
+    [
+      "follow up",
+      "follow-up"
+    ],
+    [
+      "followup",
+      "follow-up"
+    ],
+    [
+      "insure ants",
+      "insurance"
+    ],
+    [
+      "in surance",
+      "insurance"
+    ],
+    [
+      "farmacy",
+      "pharmacy"
+    ],
+    [
+      "pharmasy",
+      "pharmacy"
+    ],
+    [
+      "pharmesy",
+      "pharmacy"
+    ],
+    [
+      "perscription",
+      "prescription"
+    ],
+    [
+      "proscription",
+      "prescription"
+    ],
+    [
+      "re fill",
+      "refill"
+    ]
+  ],
+  "intentPhrases": {
+    "escalate": [
+      "human",
+      "real person",
+      "live agent",
+      "customer service",
+      "speak to someone",
+      "talk to a person",
+      "transfer me",
+      "operator please",
+      "get me a human",
+      "I want a person"
+    ],
+    "vent": [
+      "so frustrated",
+      "I'm stressed",
+      "this is ridiculous",
+      "nobody is helping",
+      "I've been calling",
+      "fed up",
+      "losing my mind",
+      "I'm exhausted",
+      "exhausted",
+      "sick of calling",
+      "going in circles",
+      "keeps giving me the runaround",
+      "I'm overwhelmed",
+      "runaround"
+    ],
+    "ask_options": [
+      "what can you do",
+      "what are my options",
+      "how does this work",
+      "who are you",
+      "what do you do",
+      "how can you help",
+      "what is RxRelay"
+    ],
+    "summarize": [
+      "summarize",
+      "where are we",
+      "catch me up",
+      "what happened so far",
+      "recap",
+      "status of my case",
+      "where is my case"
+    ],
+    "off_topic": [
+      "weather",
+      "sports",
+      "joke",
+      "who won",
+      "password",
+      "social security",
+      "credit card"
+    ],
+    "clinic_submission": [
+      "clinic submitted",
+      "clinic sent",
+      "clinic filed",
+      "doctor filed",
+      "doctor sent",
+      "doctor submitted",
+      "my doctor filed the PA",
+      "prescriber submitted",
+      "they filed the PA",
+      "PA was submitted",
+      "authorization was filed",
+      "doc took care of it",
+      "clinic already sent it",
+      "doctor handled it this morning"
+    ],
+    "pharmacy_ready": [
+      "ready for pickup",
+      "ready to pickup",
+      "prescription is ready",
+      "meds are ready",
+      "it's ready",
+      "they said it's ready",
+      "pharmacy says it's ready",
+      "I can pick it up",
+      "ready at the pharmacy",
+      "filled and ready"
+    ],
+    "pharmacy_blocker": [
+      "prior auth",
+      "prior authorization",
+      "needs a PA",
+      "PA needed",
+      "insurance is holding",
+      "insurance won't",
+      "waiting on insurance",
+      "waiting on PA",
+      "on hold",
+      "can't fill",
+      "won't fill",
+      "need the doctor",
+      "needs the doctor",
+      "insurance required",
+      "blocked by insurance",
+      "they need prior auth before they can fill"
+    ],
+    "still_waiting": [
+      "still waiting",
+      "no update",
+      "nothing yet",
+      "not yet",
+      "no word",
+      "haven't heard",
+      "any word yet",
+      "still no news"
+    ],
+    "start_coordination": [
+      "check my status",
+      "check the status",
+      "pharmacy status check",
+      "can you check",
+      "could you check",
+      "please check",
+      "what's going on",
+      "find out",
+      "look into",
+      "can you help",
+      "please help",
+      "help me",
+      "been waiting",
+      "stuck at",
+      "stuck with",
+      "can't get my",
+      "help with my prescription",
+      "help with my medication",
+      "see what's happening",
+      "figure out"
+    ],
+    "thanks": [
+      "thank you",
+      "thanks",
+      "that's all",
+      "goodbye",
+      "bye",
+      "I'm good",
+      "that's it",
+      "we're done"
+    ]
+  },
+  "consent": {
+    "decline": [
+      "I do not consent",
+      "I don't consent",
+      "no consent",
+      "do not call",
+      "do not text",
+      "I decline",
+      "leave me alone",
+      "stop calling"
+    ],
+    "explicit": [
+      "I consent",
+      "I give you permission",
+      "I give permission",
+      "yes you may",
+      "yes you can",
+      "you have my permission",
+      "go ahead",
+      "yes please",
+      "that's fine",
+      "that is fine",
+      "you can check",
+      "you can call",
+      "you can coordinate",
+      "you can text",
+      "you can help",
+      "sure you can",
+      "sure go ahead",
+      "okay you can",
+      "okay go ahead",
+      "I agree",
+      "sounds good",
+      "please do",
+      "yes please check",
+      "yes please help"
+    ],
+    "softAsk": [
+      "please help",
+      "can you help",
+      "can you check",
+      "could you check",
+      "would you check",
+      "please check",
+      "look into",
+      "I need help",
+      "help me",
+      "I need you to",
+      "could you",
+      "would you",
+      "could you look into"
+    ],
+    "story": [
+      "been waiting",
+      "can't get",
+      "can't pick",
+      "stuck at",
+      "stuck with",
+      "stuck on",
+      "pharmacy has",
+      "pharmacy won't",
+      "pharmacy can't",
+      "need my meds",
+      "need my medication",
+      "need the prescription",
+      "been stuck"
+    ],
+    "scope": [
+      "pharmacy",
+      "status",
+      "coordinate",
+      "text",
+      "update",
+      "follow-up",
+      "follow up",
+      "prescription",
+      "medication",
+      "meds",
+      "refill",
+      "prior auth",
+      "access",
+      "stuck",
+      "waiting",
+      "help me with",
+      "help with"
+    ]
+  },
+  "fewShotExemplars": [
+    {
+      "id": "alex-help",
+      "beat": "help_consent",
+      "caller": "Hi — please help, I've been stuck at CVS for five days on my metformin.",
+      "maya": "Got it — CVS and metformin, five days. I've started a pharmacy status check. What did they tell you so far?",
+      "style": "Acknowledge pharmacy + med + wait; confirm action once; ask one fact question."
+    },
+    {
+      "id": "alex-pa",
+      "beat": "pharmacy_blocker",
+      "caller": "They said they need prior authorization before they can fill it.",
+      "maya": "Prior auth is on the record. Tell me when your doctor or clinic files it.",
+      "style": "Name the blocker once; point to the next real fact needed."
+    },
+    {
+      "id": "alex-clinic",
+      "beat": "clinic_submission",
+      "caller": "My doctor filed the PA this morning.",
+      "maya": "Clinic submission recorded. Let me know when the pharmacy says it's ready for pickup.",
+      "style": "Confirm the clinic fact; wait for independent pharmacy readiness."
+    },
+    {
+      "id": "alex-ready",
+      "beat": "pharmacy_ready",
+      "caller": "The pharmacy says it's ready for pickup.",
+      "maya": "Great — readiness is recorded and your status update went out. Anything else before we wrap?",
+      "style": "Celebrate briefly; close without a menu."
+    },
+    {
+      "id": "vent-empathy",
+      "beat": "vent",
+      "caller": "I've called ten times and I'm so frustrated nobody is helping.",
+      "maya": "That runaround is exhausting. Want me to take the pharmacy status chase from here?",
+      "style": "Empathy first, one clear offer — no disclaimer dump."
+    },
+    {
+      "id": "soft-consent",
+      "beat": "help_consent",
+      "caller": "Can you check what's going on with my prescription?",
+      "maya": "Yes — I've got your okay for status follow-up. Which pharmacy are you dealing with?",
+      "style": "Treat help-ask as consent; pull one missing detail."
+    },
+    {
+      "id": "insurance-hold",
+      "beat": "pharmacy_blocker",
+      "caller": "They're waiting on insurance / PA.",
+      "maya": "Insurance hold noted as the blocker. Has your clinic submitted anything yet?",
+      "style": "Map insurance language to PA blocker; ask clinic next."
+    },
+    {
+      "id": "human-handoff",
+      "beat": "escalate",
+      "caller": "I want a real person.",
+      "maya": "Of course. I'm connecting you with a human coordinator now, and I won't take any more automated steps.",
+      "style": "Immediate handoff; stop automation."
+    },
+    {
+      "id": "still-waiting",
+      "beat": "still_waiting",
+      "caller": "Still waiting, nothing yet from them.",
+      "maya": "Understood — we'll keep it open until the pharmacy confirms ready. Anything else to note?",
+      "style": "No false progress; keep case open."
+    },
+    {
+      "id": "off-topic",
+      "beat": "off_topic",
+      "caller": "What's the weather today?",
+      "maya": "I'm focused on prescription status. Where do things stand with the pharmacy?",
+      "style": "Brief redirect; no small-talk spiral."
+    }
+  ]
+}
