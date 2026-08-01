@@ -1,31 +1,24 @@
 import { scriptedVoiceReply, TIER_LABELS } from "./pavo.mjs";
 import { goalForStatus } from "./dialogue.mjs";
 
-const SYSTEM_PROMPT = `You are Maya at RxRelay — a voice-first assistant for prescription-access coordination who can also help with ordinary questions, planning, explanations, tutoring, writing, and light brainstorming when the caller asks.
+const SYSTEM_PROMPT = `You are Maya at RxRelay — a calm phone coordinator for prescription-access status. You also answer ordinary non-clinical questions briefly when asked.
 
-Mission: help the caller understand, decide, plan, and complete permitted access tasks safely and honestly.
+You are on a live phone call. Sound like a competent human, not an IVR.
 
-Response shape (phone-friendly):
-1. Direct answer first.
-2. Brief context only when useful.
-3. At most one practical next step or clarifying question — not every turn.
-
-Style: warm, calm, intelligent, concise. Natural contractions. No filler like "I understand" every turn. Never robotic menus unless asked. Do not end every reply with "Is there anything else?"
+Response rules (strict):
+1. Speak in 1–2 short sentences. Max ~35 words unless summarizing after they ask.
+2. Answer what they just said first. Do not restate your previous reply or the same goal again.
+3. Ask at most one question, and only if you need a fact to advance the case.
+4. Never recite menus, legal disclaimers, or "I understand" filler.
+5. Never end with "Is there anything else I can help you with?"
 
 Truth rules — non-negotiable:
-- Never claim you searched, called, texted, scheduled, verified, paid, deleted, published, or completed an action unless a real tool ran and succeeded with evidence already in case context.
-- Separate clearly in your wording: suggestions/plans vs proposed actions vs completed actions.
-- For money, personal data, external messages, scheduling, deletion, publishing, purchases, health, or legal stakes: summarize the intended action and ask for explicit confirmation before treating it as approved.
+- Never claim you searched, called, texted, or completed an action unless System action just completed says so.
 - Never invent pharmacy/clinic outcomes.
+- No diagnosis, dosing, prescribing, Rx changes, or inventory answers.
+- Urgent symptoms / self-harm: urge emergency services briefly; stop automation.
 
-Hard boundaries:
-- No diagnosis, treatment, dosing, prescribing, Rx changes/transfers, controlled inventory, legal representation, or financial trading instructions.
-- Urgent symptoms / self-harm language: urge local emergency services or appropriate urgent help immediately; do not run a long questionnaire; do not claim you contacted emergency services.
-- Illegal, fraudulent, or harmful requests: refuse briefly and redirect.
-
-When the case is in prescription-access mode, advance the evidence trail only when the caller provides real status facts. When they ask a general question (science, travel planning, recipes, summaries, calculations), answer helpfully, then optionally offer to return to their access case.
-
-PAVO: if names, dates, phone numbers, amounts, or auth codes sound uncertain, confirm before acting — a stronger model cannot repair a misheard number.`;
+When they describe being stuck on a prescription after consent, help move the status trail (check → PA → clinic filed → ready) using only facts they provide.`;
 
 function responseText(payload) {
   if (typeof payload.output_text === "string" && payload.output_text.trim()) return payload.output_text.trim();
@@ -35,6 +28,15 @@ function responseText(payload) {
     }
   }
   return "";
+}
+
+function trimSpoken(text = "") {
+  const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  // Soft-cap runaway model replies for phone TTS
+  const sentences = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleaned];
+  if (sentences.length <= 2 && cleaned.split(/\s+/).length <= 45) return cleaned;
+  return sentences.slice(0, 2).join(" ").trim();
 }
 
 export class PavoInferenceEngine {
@@ -52,13 +54,13 @@ export class PavoInferenceEngine {
     if (route.tier === "verified" || route.tier === "balanced" || route.jointUpgrade) {
       return process.env.PAVO_STRONG_MODEL || process.env.PAVO_FAST_MODEL;
     }
-    return process.env.PAVO_STRONG_MODEL || process.env.PAVO_FAST_MODEL;
+    return process.env.PAVO_FAST_MODEL || process.env.PAVO_STRONG_MODEL;
   }
 
   maxTokensFor(route) {
-    if (route.tier === "verified") return 320;
-    if (route.tier === "balanced") return 280;
-    return 220;
+    if (route.tier === "verified") return 120;
+    if (route.tier === "balanced") return 100;
+    return 80;
   }
 
   async respond({
@@ -72,8 +74,11 @@ export class PavoInferenceEngine {
     actionTaken = null,
     intent = "chat",
     callerNotes = {},
+    lastAssistantReply = "",
+    scriptedFallback = "",
   }) {
-    const fallback = scriptedVoiceReply(route, { consentRecorded, statusKey });
+    const fallback = scriptedFallback
+      || scriptedVoiceReply(route, { consentRecorded, statusKey });
     if (!this.configuredFor(route)) {
       return { text: fallback, source: "local-safe-fallback", model: null, pipeline: TIER_LABELS[route.tier] };
     }
@@ -86,15 +91,18 @@ export class PavoInferenceEngine {
       "",
       `Case context: ${caseBrief}`,
       `Detected intent: ${intent}`,
-      `User-facing PAVO route: ${route.userFacingLabel || route.tier} — ${route.userFacingReason || route.reason}`,
-      actionTaken ? `System action just completed with evidence: ${actionTaken}. You may acknowledge it. Do not invent other completed actions.` : "No tool execution this turn — answer or plan only; do not claim outreach happened.",
+      actionTaken
+        ? `System action just completed with evidence: ${actionTaken}. Acknowledge once, briefly. Do not invent other completed actions.`
+        : "No tool execution this turn — do not claim outreach happened.",
       `Caller notes: ${JSON.stringify(callerNotes || {})}`,
-      `Current access-task goal: ${goal}`,
+      `Internal goal (do not recite verbatim): ${goal}`,
+      lastAssistantReply
+        ? `Your previous spoken line (do NOT repeat or paraphrase): ${lastAssistantReply}`
+        : "Your previous spoken line: (none)",
       conversationDigest ? `Recent conversation:\n${conversationDigest}` : "Recent conversation: (start of call)",
       `Caller just said: ${transcript}`,
-      `PAVO internals: tier=${route.tier}; demand=${demand}; jointUpgrade=${Boolean(route.jointUpgrade)}`,
-      `Guardrail: ${route.guardrail}`,
-      "Reply for spoken playback only. Direct answer first.",
+      `PAVO: tier=${route.tier}; demand=${demand}`,
+      "Reply for spoken playback only. One or two short sentences. New information only.",
     ].join("\n");
     try {
       const response = await this.fetch(endpoint, {
@@ -110,7 +118,7 @@ export class PavoInferenceEngine {
         }),
       });
       if (!response.ok) throw new Error(`Responses API returned ${response.status}`);
-      const text = responseText(await response.json());
+      const text = trimSpoken(responseText(await response.json()));
       return {
         text: text || fallback,
         source: text ? "openai-compatible" : "local-safe-fallback",

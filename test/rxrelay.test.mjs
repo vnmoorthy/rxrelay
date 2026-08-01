@@ -296,10 +296,52 @@ test("dialogue understands venting, off-topic, and story-shaped outcomes", () =>
   );
 });
 
-test("natural consent phrases still require a scoped yes", () => {
+test("natural help requests count as scoped consent", () => {
   assert.equal(consentFromTranscript("sure, you can check my pharmacy status").granted, true);
-  assert.equal(consentFromTranscript("please help with my prescription").granted, false);
+  assert.equal(consentFromTranscript("please help with my prescription").granted, true);
   assert.equal(consentFromTranscript("please help with my prescription").softAsk, true);
+  assert.equal(consentFromTranscript("I've been waiting five days and can't get my medication from CVS").granted, true);
+});
+
+test("ASR repairs and avoid-repeat keep phone turns clean", async () => {
+  const { normalizeTranscript, avoidRepeat } = await import("../src/dialogue.mjs");
+  assert.match(normalizeTranscript("they need prior off before they can fill it"), /prior auth/i);
+  assert.match(normalizeTranscript("I'm stuck at see vs pharmacy"), /CVS/i);
+  const repeated = avoidRepeat(
+    "I'm listening. Learn what they need.",
+    [{ role: "assistant", text: "I'm listening. Learn what they need." }],
+  );
+  assert.notEqual(repeated, "I'm listening. Learn what they need.");
+});
+
+test("natural patient story completes proof without legalese consent", async () => {
+  const store = new CaseStore({ telephony: new DemoTelephonyAdapter(), seedDemo: false });
+  const opened = store.openVoiceCase({ callId: "story-1", from: "+15550007777" });
+  await store.handleVoiceTurn({
+    caseId: opened.id,
+    transcript: "Hi, please help — I've been stuck at CVS pharmacy for five days on my metformin.",
+    asrConfidence: 0.94,
+  });
+  assert.equal(store.get(opened.id).evidence.consentRecorded, true);
+  await store.handleVoiceTurn({
+    caseId: opened.id,
+    transcript: "They said they need prior authorization before they can fill it.",
+    asrConfidence: 0.93,
+  });
+  assert.ok(store.get(opened.id).pharmacy.blocker);
+  await store.handleVoiceTurn({
+    caseId: opened.id,
+    transcript: "My doctor filed the PA this morning.",
+    asrConfidence: 0.95,
+  });
+  assert.equal(store.get(opened.id).clinic.submissionRecorded, true);
+  await store.handleVoiceTurn({
+    caseId: opened.id,
+    transcript: "The pharmacy says it's ready for pickup.",
+    asrConfidence: 0.96,
+  });
+  assert.equal(store.get(opened.id).status.key, "resolved");
+  assert.equal(store.get(opened.id).proof.ready, true);
 });
 
 test("caller notes capture pharmacy mentions", () => {

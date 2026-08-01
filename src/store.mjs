@@ -12,6 +12,9 @@ import {
   goalForStatus,
   extractCallerNotes,
   recentTranscriptDigest,
+  normalizeTranscript,
+  avoidRepeat,
+  lastSpokenLine,
 } from "./dialogue.mjs";
 
 const now = () => new Date().toISOString();
@@ -139,6 +142,7 @@ export class CaseStore {
         receiptTip: null,
         conversationTurns: [],
         callerNotes: {},
+        digitHintSpoken: false,
       };
       this.cases.set(caseId, record);
       this.addEvent(record, "case_created", "Case created with minimum necessary details.", "system", { source, pavoTier: routed.tier });
@@ -290,6 +294,7 @@ export class CaseStore {
         receiptTip: null,
         conversationTurns: [],
         callerNotes: {},
+        digitHintSpoken: false,
       };
       this.cases.set(caseId, record);
       this.addEvent(record, "case_created", "Case created with minimum necessary details.", "system", { source: "voice", pavoTier: routed.tier });
@@ -307,35 +312,45 @@ export class CaseStore {
       if (!record.conversationTurns) record.conversationTurns = [];
       if (!record.callerNotes) record.callerNotes = {};
 
+      const spoken = normalizeTranscript(transcript);
       const previouslyConsented = record.evidence.consentRecorded;
-      const consentParse = consentFromTranscript(transcript);
+      const consentParse = consentFromTranscript(spoken);
       let consentRecorded = false;
-      if (!previouslyConsented && consentParse.granted === false && consentParse.scoped) {
+      if (!previouslyConsented && consentParse.granted === false && consentParse.scoped && /\b(i do not consent|i don't consent|i decline|leave me alone|stop calling)\b/i.test(spoken)) {
         record.humanReview = true;
-        this.addEvent(record, "consent_declined", "Caller declined consent; case held for human review.", "patient", { statement: String(transcript) });
+        this.addEvent(record, "consent_declined", "Caller declined consent; case held for human review.", "patient", { statement: spoken });
       } else if (!previouslyConsented && consentParse.granted) {
         record.evidence.consentRecorded = true;
         consentRecorded = true;
-        this.addEvent(record, "consent_recorded", "Explicit consent recorded for permitted status coordination and updates.", "patient", { source: "voice", statement: String(transcript) });
+        this.addEvent(record, "consent_recorded", "Consent recorded for permitted status coordination and updates.", "patient", {
+          source: "voice",
+          statement: spoken,
+          soft: Boolean(consentParse.softAsk && !consentParse.saysConsent),
+        });
       }
 
-      Object.assign(record.callerNotes, extractCallerNotes(transcript));
+      Object.assign(record.callerNotes, extractCallerNotes(spoken));
       if (record.callerNotes.medicationHint && record.medication === "Prescription access request") {
         record.medication = record.callerNotes.medicationHint;
       }
 
       const statusBefore = deriveStatus(record).key;
       let action = null;
-      const intent = detectConversationalIntent(transcript, statusBefore);
-      if (previouslyConsented && !record.humanReview) {
+      const intent = detectConversationalIntent(spoken, statusBefore);
+      const canAct = (previouslyConsented || consentRecorded) && !record.humanReview;
+      if (canAct) {
         try {
-          if (intent === "start_coordination" && !record.coordinationStarted) {
-            await this.beginCoordinationUnlocked(caseId);
-            action = "start_coordination";
-          } else if (intent === "pharmacy_blocker" && record.coordinationStarted && !record.pharmacy.blocker) {
-            const blocker = /insurance/i.test(transcript) ? "Insurance / prior authorization hold" : "Prior authorization needed";
+          if (intent === "pharmacy_blocker" && !record.pharmacy.blocker) {
+            if (!record.coordinationStarted) await this.beginCoordinationUnlocked(caseId);
+            const blocker = /insurance/i.test(spoken) ? "Insurance / prior authorization hold" : "Prior authorization needed";
             this.recordPharmacyBlockerUnlocked(caseId, { blocker });
             action = "pharmacy_blocker";
+          } else if (
+            (intent === "start_coordination" || (intent === "vent" && /\b(stuck|waiting|can'?t get|pharmacy|prescription)\b/i.test(spoken)))
+            && !record.coordinationStarted
+          ) {
+            await this.beginCoordinationUnlocked(caseId);
+            action = "start_coordination";
           } else if (intent === "clinic_submission" && record.pharmacy.blocker && !record.clinic.submissionRecorded) {
             this.recordClinicSubmissionUnlocked(caseId);
             action = "clinic_submission";
@@ -356,46 +371,45 @@ export class CaseStore {
         action = "escalate";
       }
 
-      // Soft auto-start: consented caller tells a stuck-prescription story without explicit "check status"
-      if (previouslyConsented && !action && !record.humanReview && !record.coordinationStarted && intent === "vent") {
-        // stay conversational — do not auto-start without a clear ask
-      }
-
-      const actionLabel = consentRecorded ? "consent" : action;
+      const actionLabel = consentRecorded && !action ? "consent" : action;
       const digest = recentTranscriptDigest(record.conversationTurns);
-      const result = await this.inboundTurnUnlocked({
-        caseId,
-        transcript,
-        asrConfidence,
-        noiseLevel,
-        intentConfidence,
-        dialogueHint: goalForStatus(deriveStatus(record).key, { consented: record.evidence.consentRecorded }),
-        conversationDigest: digest,
-        actionTaken: actionLabel,
-        intent,
-        callerNotes: record.callerNotes,
-      });
-
-      const statusKey = deriveStatus(record).key;
+      const lastAssistant = lastSpokenLine(record.conversationTurns);
+      const statusForReply = deriveStatus(record).key;
       const fallback = scriptedConversationalReply({
-        statusKey,
+        statusKey: statusForReply,
         consented: record.evidence.consentRecorded,
         action: actionLabel,
         intent,
         caseId,
         humanReview: record.humanReview,
         notes: record.callerNotes,
+        conversationTurns: record.conversationTurns,
+      });
+
+      const result = await this.inboundTurnUnlocked({
+        caseId,
+        transcript: spoken,
+        asrConfidence,
+        noiseLevel,
+        intentConfidence,
+        dialogueHint: goalForStatus(statusForReply, { consented: record.evidence.consentRecorded }),
+        conversationDigest: digest,
+        actionTaken: actionLabel,
+        intent,
+        callerNotes: record.callerNotes,
+        lastAssistantReply: lastAssistant,
+        scriptedFallback: fallback,
       });
 
       let reply = fallback;
       if (result.route.tier === "safe_stop") {
         reply = result.reply;
       } else if (result.inference?.source === "openai-compatible" && result.reply) {
-        // Prefer Maya's natural model voice for almost all turns, including after actions.
         reply = result.reply;
       }
+      reply = avoidRepeat(reply, record.conversationTurns);
 
-      record.conversationTurns.push({ role: "user", text: String(transcript), at: now(), intent, action: actionLabel });
+      record.conversationTurns.push({ role: "user", text: spoken, at: now(), intent, action: actionLabel });
       record.conversationTurns.push({ role: "assistant", text: reply, at: now() });
       if (record.conversationTurns.length > 40) record.conversationTurns = record.conversationTurns.slice(-40);
 
@@ -432,6 +446,15 @@ export class CaseStore {
       record.pendingAction = null;
       this.addEvent(record, "session_forgotten", "Conversation memory for this session was cleared on request.", "system");
       publishCaseEvent("session_forgotten", { caseId: id });
+      return this.getUnlocked(id);
+    });
+  }
+
+  markDigitHintSpoken(id) {
+    return this.mutate(() => {
+      const record = this.cases.get(id);
+      if (!record) return null;
+      record.digitHintSpoken = true;
       return this.getUnlocked(id);
     });
   }
@@ -566,10 +589,19 @@ export class CaseStore {
     actionTaken = null,
     intent = "chat",
     callerNotes = {},
+    lastAssistantReply = "",
+    scriptedFallback = "",
   }) {
     const record = this.cases.get(caseId);
     if (!record) throw new Error(`Case ${caseId} was not found.`);
-    const route = routeTurn({ transcript, asrConfidence, noiseLevel, intentConfidence, historyDepth: record.events.length });
+    const userTurns = (record.conversationTurns || []).filter((turn) => turn.role === "user").length;
+    const route = routeTurn({
+      transcript,
+      asrConfidence,
+      noiseLevel,
+      intentConfidence,
+      historyDepth: userTurns,
+    });
     record.lastRoute = route;
     const statusKey = deriveStatus(record).key;
     const inference = await this.inference.respond({
@@ -582,6 +614,8 @@ export class CaseStore {
       actionTaken,
       intent,
       callerNotes,
+      lastAssistantReply,
+      scriptedFallback,
       caseBrief: `Case ${caseId}; consent=${record.evidence.consentRecorded}; status=${statusKey}; medication=${record.medication}; coordinationStarted=${record.coordinationStarted}; pharmacyBlocker=${record.pharmacy.blocker || "none"}; clinicSubmitted=${record.clinic.submissionRecorded}; ready=${record.pharmacy.readyForPickup}; proof=${JSON.stringify(record.evidence)}; notes=${JSON.stringify(record.callerNotes || {})}.`,
     });
     this.addEvent(record, "voice_turn", inference.text, "patient", {

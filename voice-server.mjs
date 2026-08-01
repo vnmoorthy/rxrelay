@@ -67,14 +67,14 @@ function say(text) {
 /**
  * PAVO capture upgrade: verified turns open speech + DTMF so critical
  * authorization digits can be confirmed without relying on a better LLM alone.
+ * No trailing <Say> after Gather — empty SpeechResult re-prompts once via action URL
+ * (avoids double-speaking the miss message).
  */
 function gather(prompt, action, { verified = false } = {}) {
   const input = verified ? "speech dtmf" : "speech";
-  const hints = verified
-    ? ' hints="authorization number, prior auth, pharmacy status, clinic submitted, ready for pickup"'
-    : ' hints="consent, pharmacy status, prior authorization, clinic, ready for pickup, human"';
+  const hints = ' hints="consent, help with my prescription, pharmacy status, prior authorization, clinic submitted, ready for pickup, CVS, Walgreens, human"';
   const numDigits = verified ? ' numDigits="8"' : "";
-  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="10" speechTimeout="auto" language="en-US" profanityFilter="false"${numDigits}${hints}>${say(prompt)}</Gather>${say(noInputPrompt())}`;
+  return `<Gather input="${input}" action="${xmlEscape(action)}" method="POST" timeout="8" speechTimeout="auto" language="en-US" profanityFilter="false"${numDigits}${hints}>${say(prompt)}</Gather><Redirect method="POST">${xmlEscape(action)}</Redirect>`;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -115,11 +115,15 @@ const server = http.createServer(async (req, res) => {
       noiseLevel: Number(payload.noiseLevel || (digits ? 0.02 : 0.1)),
     });
     const verified = result.route?.tier === "verified" || result.route?.jointUpgrade;
-    let spoken = result.case.humanReview
-      ? result.reply
-      : result.reply;
-    if (verified && !digits && !result.case.humanReview) {
-      spoken = `${spoken} If you have an authorization or reference number, you can also enter the digits on your keypad.`;
+    let spoken = result.reply;
+    // Keypad hint once per case — repeating it every verified turn felt robotic.
+    if (verified && !digits && !result.case.humanReview && !result.case.digitHintSpoken) {
+      spoken = `${spoken} If you have a reference number, you can enter the digits on your keypad.`;
+      try {
+        store.markDigitHintSpoken?.(caseId);
+      } catch {
+        /* optional */
+      }
     }
     return sendXml(res, gather(spoken, nextUrl(req, "/voice/turn", { caseId }), { verified }));
   } catch {
