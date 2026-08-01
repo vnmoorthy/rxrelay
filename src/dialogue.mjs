@@ -13,11 +13,10 @@ export function sayVoiceAttrs() {
 export function openPrompt() {
   return [
     "Hi, this is Maya with RxRelay — thanks for calling.",
-    "I help people when a prescription is stuck between the pharmacy, clinic, or insurer.",
-    "I can check status, track prior authorization follow-ups, and text you updates once you consent.",
-    "I can't give medical advice or change a prescription.",
-    "Whenever you're ready, say that you consent to a pharmacy status follow-up and text updates,",
-    "or just tell me what's going on in your own words — I'll guide us from there.",
+    "I can help with everyday questions and planning, and I specialize in prescription access status — pharmacy delays, prior authorization follow-ups, and pickup readiness.",
+    "I can't give medical advice or change a prescription, and I never pretend I called or texted someone unless it actually happened.",
+    "Tell me what's on your mind in your own words.",
+    "If you want status coordination and texts, say you consent to a pharmacy status follow-up and text updates.",
   ].join(" ");
 }
 

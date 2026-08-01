@@ -423,6 +423,41 @@ export class CaseStore {
     if (record.humanReview) throw new Error("This case is held for human review; no autonomous action is permitted.");
   }
 
+  forgetSession(id) {
+    return this.mutate(() => {
+      const record = this.cases.get(id);
+      if (!record) throw new Error(`Case ${id} was not found.`);
+      record.conversationTurns = [];
+      record.callerNotes = {};
+      record.pendingAction = null;
+      this.addEvent(record, "session_forgotten", "Conversation memory for this session was cleared on request.", "system");
+      publishCaseEvent("session_forgotten", { caseId: id });
+      return this.getUnlocked(id);
+    });
+  }
+
+  /** Redact secrets-ish content for UI timelines (demo-safe). */
+  getPublicView(id) {
+    const view = this.get(id);
+    const redact = (text = "") => String(text)
+      .replace(/\+?\d[\d\s().-]{8,}\d/g, "[phone]")
+      .replace(/\b\d{6}\b/g, "[code]")
+      .replace(/Bearer\s+\S+/gi, "[token]");
+    view.events = (view.events || []).map((event) => ({
+      ...event,
+      summary: redact(event.summary),
+    }));
+    view.conversationTurns = (view.conversationTurns || []).map((turn) => ({
+      ...turn,
+      text: redact(turn.text),
+    }));
+    if (view.patient?.recipient) {
+      view.patient = { ...view.patient, recipient: "[redacted]" };
+    }
+    return view;
+  }
+
+
   async beginCoordination(id) {
     return this.mutateAsync(async () => this.beginCoordinationUnlocked(id));
   }

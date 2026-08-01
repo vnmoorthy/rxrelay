@@ -27,3 +27,5 @@ body{font-family:Sora,ui-sans-serif,system-ui,sans-serif}
 #export-receipt{width:100%}
 #export-receipt:disabled{opacity:.4;cursor:not-allowed}
 @media (max-width:1000px){.ops-grid{grid-template-columns:1fr}.topbar{flex-wrap:wrap}}
+.route-chip{display:inline-block;margin-right:8px;padding:3px 8px;border-radius:999px;background:#73e3d2;color:#0b2e2b;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+#forget-session{margin-top:8px;border-color:#d7c4c4;color:#8a4b4b}

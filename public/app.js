@@ -27,7 +27,7 @@ function modeLabel(configuration) {
 function pipeline(caseRecord) {
   const selected = caseRecord.lastRoute.tier;
   const steps = ["fast", "balanced", "verified", "safe_stop"];
-  const labels = { fast: "Fast intake", balanced: "Balanced", verified: "Verified", safe_stop: "Safety stop" };
+  const labels = { fast: "Fast response", balanced: "Balanced help", verified: "Verified details", safe_stop: "Safety handoff" };
   return steps.map((step, index) => `${index ? '<span class="pipe-arrow">→</span>' : ""}<span class="pipe-step ${step === selected ? "active" : ""}">${labels[step]}</span>`).join("");
 }
 
@@ -63,7 +63,10 @@ function render(caseRecord) {
   $("#case-created").textContent = `Opened ${time(caseRecord.createdAt)}`;
   const status = $("#case-status"); status.textContent = caseRecord.status.label; status.className = `status ${caseRecord.status.tone}`;
   $("#patient-name").textContent = caseRecord.patient.alias;
-  $("#pavo-label").textContent = `${caseRecord.pipeline.label} · ${caseRecord.lastRoute.reason}${caseRecord.lastRoute.signals?.demand != null ? ` · demand ${caseRecord.lastRoute.signals.demand}` : ""}`;
+  const faceLabel = caseRecord.lastRoute.userFacingLabel || caseRecord.pipeline.label;
+  const faceReason = caseRecord.lastRoute.userFacingReason || caseRecord.lastRoute.reason;
+  $("#route-chip").textContent = faceLabel;
+  $("#pavo-label").textContent = `${faceReason}${caseRecord.lastRoute.signals?.demand != null ? ` · demand ${caseRecord.lastRoute.signals.demand}` : ""}`;
   $("#pipeline").innerHTML = pipeline(caseRecord);
   $("#patient-lane").innerHTML = laneEvent(caseRecord, "patient", "Waiting for a consented request.");
   $("#pharmacy-lane").innerHTML = laneEvent(caseRecord, "pharmacy", "No pharmacy outcome recorded.");
@@ -177,6 +180,17 @@ $("#export-receipt").addEventListener("click", async () => {
     URL.revokeObjectURL(url);
     toast(`Receipt tip ${result.receipt.tip.slice(0, 12)}…`);
     await loadCases(activeCase.id);
+  } catch (error) {
+    toast(error.message);
+  }
+});
+
+$("#forget-session").addEventListener("click", async () => {
+  if (!activeCase) return;
+  try {
+    const result = await request(`/api/cases/${activeCase.id}/forget`, { method: "POST", body: "{}" });
+    render(result.case);
+    toast("Session memory cleared.");
   } catch (error) {
     toast(error.message);
   }

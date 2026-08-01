@@ -221,8 +221,9 @@ const server = http.createServer(async (req, res) => {
   try {
     if (pathname === "/api/health" && req.method === "GET") return json(res, 200, { ok: true, ...config(), time: new Date().toISOString() });
     if (pathname === "/api/config" && req.method === "GET") return json(res, 200, config());
-    if (pathname === "/api/cases" && req.method === "GET") return json(res, 200, { cases: store.list() });
-    if (pathname === "/api/cases" && req.method === "POST") return json(res, 201, { case: store.createCase(await body(req)) });
+    if (pathname === "/api/cases" && req.method === "GET") {
+      return json(res, 200, { cases: store.list().map((item) => store.getPublicView(item.id)) });
+    }    if (pathname === "/api/cases" && req.method === "POST") return json(res, 201, { case: store.createCase(await body(req)) });
     if (pathname === "/api/ops/queue" && req.method === "GET") return json(res, 200, { queue: store.listHumanQueue() });
     if (pathname === "/api/ops/timeout-scan" && req.method === "POST") {
       const payload = await body(req);
@@ -243,9 +244,9 @@ const server = http.createServer(async (req, res) => {
     if (pathname === "/mcp" && req.method === "POST") return handleMcp(req, res);
 
     const caseMatch = pathname.match(/^\/api\/cases\/([^/]+)$/);
-    if (caseMatch && req.method === "GET") return json(res, 200, { case: store.get(decodeURIComponent(caseMatch[1])) });
+    if (caseMatch && req.method === "GET") return json(res, 200, { case: store.getPublicView(decodeURIComponent(caseMatch[1])) });
 
-    const actionMatch = pathname.match(/^\/api\/cases\/([^/]+)\/(consent|start|pharmacy-blocker|clinic-submission|pharmacy-ready|send-update|escalate|resume|counterpart-link|receipt)$/);
+    const actionMatch = pathname.match(/^\/api\/cases\/([^/]+)\/(consent|start|pharmacy-blocker|clinic-submission|pharmacy-ready|send-update|escalate|resume|counterpart-link|receipt|forget)$/);
     if (actionMatch && req.method === "POST") {
       const caseId = decodeURIComponent(actionMatch[1]);
       const action = actionMatch[2];
@@ -259,13 +260,14 @@ const server = http.createServer(async (req, res) => {
       if (action === "send-update") updated = await store.sendPatientUpdate(caseId, payload.text || "We are still coordinating your prescription access status.");
       if (action === "escalate") updated = store.escalate(caseId, payload.reason);
       if (action === "resume") updated = store.resumeAutomation(caseId, payload.reason);
+      if (action === "forget") updated = store.forgetSession(caseId);
       if (action === "counterpart-link") {
         const issued = store.issueCounterpartLink(caseId, payload.role || "pharmacy");
         const base = `${requestUrl.protocol}//${requestUrl.host}`;
         return json(res, 200, { ...issued, url: `${base}/attest/${issued.link.token}` });
       }
       if (action === "receipt") return json(res, 200, { receipt: store.exportReceipt(caseId) });
-      return json(res, 200, { case: updated });
+      return json(res, 200, { case: store.getPublicView(caseId) });
     }
 
     const attestMatch = pathname.match(/^\/attest\/([^/]+)$/);

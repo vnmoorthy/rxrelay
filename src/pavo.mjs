@@ -12,11 +12,13 @@
  */
 
 const SAFE_STOP_PATTERNS = [
-  [/chest pain|difficulty breathing|overdose|passed out|unconscious|suicid|can't breathe|cannot breathe/i, "urgent medical situation"],
-  [/should I take|how much.*take|dosage|side effects|diagnose|medical advice|is it safe to/i, "clinical advice request"],
-  [/transfer.*prescription|change.*prescription|new prescription|increase.*(dose|medication)/i, "prescription change request"],
+  [/chest pain|difficulty breathing|overdose|passed out|unconscious|suicid|kill myself|self[- ]harm|can't breathe|cannot breathe/i, "urgent medical or self-harm situation"],
+  [/should I take|how much.*take|dosage|side effects|diagnose|medical advice|is it safe to|what (medication|drug) should/i, "clinical advice request"],
+  [/transfer.*prescription|change.*prescription|new prescription|increase.*(dose|medication)|refill without/i, "prescription change request"],
   [/do you have.*(adderall|opioid|controlled)|controlled.*inventory|narcotic.*stock/i, "controlled-medication inventory request"],
-  [/my social security|credit card|bank account|routing number/i, "sensitive identity information"],
+  [/my social security|credit card|bank account|routing number|password|one[- ]time (pass)?code|otp code/i, "sensitive identity or credential information"],
+  [/\b(how (do|to) (hack|steal|launder|make a bomb)|commit fraud|evade taxes? illegally)\b/i, "harmful or illegal request"],
+  [/\b(file (a )?lawsuit for me|represent me in court|guaranteed investment returns|day trade this for me)\b/i, "high-stakes legal or financial professional request"],
 ];
 
 const CRITICAL_ENTITY_PATTERNS = [
@@ -25,9 +27,36 @@ const CRITICAL_ENTITY_PATTERNS = [
   /pharmacy|clinic|prescriber|doctor|pharmacist/i,
   /mg\b|milligram|refill|medication|prescription/i,
   /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b|\b[A-Z]{0,3}\d{4,}\b/,
+  /\+?\d[\d\s().-]{8,}\d/,
+  /\b\d{1,5}\s+\w+\s+(street|st|ave|avenue|road|rd|blvd|drive|dr)\b/i,
+  /\$\s?\d[\d,]*(?:\.\d{2})?|\b\d+\s*(dollars|usd)\b/i,
+  /\b([01]?\d|2[0-3]):[0-5]\d\b|\b\d{1,2}\s*(am|pm)\b/i,
+  /\b(my name is|call me)\s+[A-Z][a-z]+/i,
 ];
 
-const PARTNER_ACTION_PATTERNS = /call.*pharmacy|call.*clinic|call.*insurance|check.*status|follow[\s-]?up|prior auth|ready.*pickup|coordinate/i;
+const PARTNER_ACTION_PATTERNS = /call.*pharmacy|call.*clinic|call.*insurance|check.*status|follow[\s-]?up|prior auth|ready.*pickup|coordinate|text (me|my)|send (an? )?sms|schedule|book|reserve|pay|purchase|delete|publish/i;
+
+const USER_FACING_ROUTE = {
+  fast: { label: "Fast response", reason: "Simple turn — kept the path light." },
+  balanced: { label: "Balanced help", reason: "Ordinary question or planning — using full conversation context." },
+  verified: { label: "Verified details", reason: "Important details or action risk — confirming carefully." },
+  safe_stop: { label: "Safety handoff", reason: "This needs a human or professional path, not automation." },
+};
+
+function withUserFacing(route) {
+  const face = USER_FACING_ROUTE[route.tier] || USER_FACING_ROUTE.balanced;
+  let reason = face.reason;
+  if (route.tier === "verified" && route.signals?.hasCriticalEntity) {
+    reason = "Verified details because this request included sensitive names, dates, numbers, or contact info.";
+  } else if (route.tier === "verified" && route.signals?.requestsPartnerAction) {
+    reason = "Verified details because an external action was requested.";
+  } else if (route.tier === "verified" && (route.signals?.asrConfidence < 0.84 || route.signals?.noise > 0.4)) {
+    reason = "Verified details because the audio was uncertain.";
+  } else if (route.tier === "safe_stop" && route.reason) {
+    reason = `Safety handoff: ${route.reason}.`;
+  }
+  return { ...route, userFacingLabel: face.label, userFacingReason: reason };
+}
 
 /** Approximate WER proxy from ASR confidence — used for coupling-cliff logic. */
 export function estimateWer(asrConfidence = 0.93) {
@@ -133,7 +162,7 @@ export function routeTurn(input = {}) {
 
   for (const [pattern, reason] of SAFE_STOP_PATTERNS) {
     if (pattern.test(normalized)) {
-      return {
+      return withUserFacing({
         tier: "safe_stop",
         reason,
         signals,
@@ -141,9 +170,9 @@ export function routeTurn(input = {}) {
         reasoningTier: TIER_LABELS.safe_stop.reasoningTier,
         paperRoute: TIER_LABELS.safe_stop.paperRoute,
         jointUpgrade: false,
-        guardrail: "No medical advice, prescription changes, inventory disclosure, or autonomous outreach.",
+        guardrail: "No medical advice, prescription changes, inventory disclosure, illegal assistance, or autonomous outreach.",
         citation: "PAVO hard-constraint masking — unsafe turns are not routed to action models.",
-      };
+      });
     }
   }
 
@@ -153,7 +182,7 @@ export function routeTurn(input = {}) {
   const couplingRisk = signals.nearCouplingCliff || (transcriptionRisk && evidenceRisk);
 
   if (couplingRisk || transcriptionRisk || (ambiguityRisk && evidenceRisk) || signals.demand >= 0.62) {
-    return {
+    return withUserFacing({
       tier: "verified",
       reason: couplingRisk
         ? "near ASR↔LLM coupling cliff; jointly upgrade transcription and reasoning"
@@ -167,24 +196,24 @@ export function routeTurn(input = {}) {
       jointUpgrade: true,
       guardrail: "Confirm critical names, dates, numbers, and outcomes before any coordination action.",
       citation: "PAVO coupling cliff — downstream LLMs cannot recover facts lost to upstream ASR error.",
-    };
+    });
   }
 
   if (evidenceRisk || signals.demand >= 0.34 || signals.historyDepth > 2) {
-    return {
+    return withUserFacing({
       tier: "balanced",
-      reason: "coordination demand requires hybrid ASR + tool-aware reasoning",
+      reason: "coordination or planning demand requires hybrid ASR + tool-aware reasoning",
       signals,
       asrTier: TIER_LABELS.balanced.asrTier,
       reasoningTier: TIER_LABELS.balanced.reasoningTier,
       paperRoute: TIER_LABELS.balanced.paperRoute,
       jointUpgrade: true,
-      guardrail: "Record only permitted, minimum-necessary coordination facts.",
+      guardrail: "Record only permitted, minimum-necessary coordination facts. Never invent tool success.",
       citation: "PAVO hybrid_balanced route — spend quality where turn demand warrants it.",
-    };
+    });
   }
 
-  return {
+  return withUserFacing({
     tier: "fast",
     reason: "low-demand conversational turn; edge-fast pipeline is coupling-safe",
     signals,
@@ -194,7 +223,7 @@ export function routeTurn(input = {}) {
     jointUpgrade: false,
     guardrail: "No protected action is available on this tier.",
     citation: "PAVO ondevice_fast — avoid over-provisioning cloud routes on easy turns.",
-  };
+  });
 }
 
 export function scriptedVoiceReply(route, { consentRecorded = false, statusKey = "intake" } = {}) {

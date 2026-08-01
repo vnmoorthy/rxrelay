@@ -307,3 +307,32 @@ test("caller notes capture pharmacy mentions", () => {
   assert.ok(notes.pharmacyName);
   assert.equal(notes.waitDays, 5);
 });
+
+test("PAVO exposes tasteful user-facing route labels", () => {
+  const verified = routeTurn({
+    transcript: "Please call +15551234567 tomorrow at 3:00 pm about prior authorization PA2048",
+    asrConfidence: 0.7,
+    noiseLevel: 0.5,
+  });
+  assert.equal(verified.tier, "verified");
+  assert.equal(verified.userFacingLabel, "Verified details");
+  assert.match(verified.userFacingReason, /Verified details/i);
+
+  const safe = routeTurn({ transcript: "I have chest pain and difficulty breathing" });
+  assert.equal(safe.tier, "safe_stop");
+  assert.equal(safe.userFacingLabel, "Safety handoff");
+});
+
+test("forget session clears conversation memory", async () => {
+  const store = new CaseStore({ telephony: new DemoTelephonyAdapter(), seedDemo: false });
+  const opened = store.openVoiceCase({ callId: "forget-1", from: "+15550006666" });
+  await store.handleVoiceTurn({
+    caseId: opened.id,
+    transcript: "I consent to a pharmacy status follow-up and text updates.",
+    asrConfidence: 0.96,
+  });
+  assert.ok(store.get(opened.id).conversationTurns.length > 0);
+  const cleared = store.forgetSession(opened.id);
+  assert.equal(cleared.conversationTurns.length, 0);
+  assert.equal(store.getPublicView(opened.id).patient.recipient, "[redacted]");
+});
