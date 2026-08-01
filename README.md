@@ -233,8 +233,10 @@ Full script (dashboard sandbox): [`docs/DEMO.md`](docs/DEMO.md) · **judge live 
 
 ```bash
 npm run dev            # proof board on :3000
-npm run live:inbound   # voice :3001 → Cloudflare tunnel → point claimed number
+npm run live:inbound   # voice :3001 → public tunnel → point claimed number
 ```
+
+`live:inbound` tries Cloudflare quick tunnel first, then falls back to **Serveo** (`ssh -R … serveo.net`) when Cloudflare returns 429/1015. Override with `VOICE_TUNNEL=serveo` or reuse an existing URL via `TUNNEL_PUBLIC_URL=https://…`.
 
 Then call the claimed number and say:
 
@@ -250,6 +252,18 @@ Then call the claimed number and say:
 > ```
 >
 > Details: [`docs/A1MOBILE_LIVE_SETUP.md`](docs/A1MOBILE_LIVE_SETUP.md)
+
+### Optional LiveKit + OpenAI Realtime (post-hackathon)
+
+**Tonight's demo stays on TeXML.** ChatGPT Realtime needs media streaming (WebRTC/WebSocket), not TeXML `<Gather>` turn-taking. The a1 PAVO gateway (`hack.a1mobile.com/gw/v1`) exposes chat models only (`sol` / `terra` / `luna`) — `/realtime` returns 404 — so Realtime needs a **direct** `OPENAI_API_KEY`, plus LiveKit Cloud, plus switching the claimed number from webhook → SIP using creds from `GET /api/numbers/me`.
+
+Twilio is a different carrier and is **not** on the a1mobile claimed DID without leaving hackathon rails. Photon Spectrum (`@photon-ai/voice-ts`) is a real product (messaging + voice over Photon's gRPC plane) but needs a Photon `VOICE_TOKEN` and does not answer `+18026768127` faster than TeXML tonight.
+
+Scaffold (fails closed until keys exist; does not remove TeXML):
+
+```bash
+npm run voice:realtime   # checks LIVEKIT_* + OPENAI_API_KEY + A1_SIP_*
+```
 
 ---
 

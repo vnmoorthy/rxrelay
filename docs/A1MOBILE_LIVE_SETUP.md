@@ -53,9 +53,19 @@ Or manually:
 npm run voice
 ```
 
-`live:inbound` binds the TeXML service on `VOICE_PORT` (default 3001), opens a Cloudflare quick tunnel to that process only, and points the claimed number with `POST /api/numbers/point` `{ "webhook_url": "https://…/voice?token=…" }`.
+`live:inbound` binds the TeXML service on `VOICE_PORT` (default 3001), opens a **voice-only** public tunnel, and points the claimed number with `POST /api/numbers/point` `{ "webhook_url": "https://…/voice?token=…" }`.
+
+Tunnel order (`VOICE_TUNNEL=auto` by default):
+
+1. Cloudflare quick tunnel (`CLOUDFLARED_BIN`) — often 429/1015 under hackathon load
+2. Serveo SSH reverse tunnel (`ssh -R 80:127.0.0.1:$VOICE_PORT serveo.net`) — no account
+3. Or set `TUNNEL_PUBLIC_URL` / `VOICE_TUNNEL=serveo|cloudflare|none` explicitly
 
 The a1mobile number calls this endpoint as TeXML. RxRelay returns a `<Gather input="speech">` response and receives form-encoded `SpeechResult` callbacks at `/voice/turn`. Consent is soft for demo UX: an unambiguous “I consent…” phrase still works, and asking for help with prescription/pharmacy status also counts as scoped yes.
+
+### SIP / Realtime (optional, not the demo path)
+
+`GET /api/numbers/me` returns Telnyx SIP host/username/password while `mode` is still `"webhook"`. LiveKit inbound trunk + OpenAI Realtime is a post-hackathon path: the a1 chat gateway does **not** proxy Realtime websockets. Keep TeXML pointed until a SIP path is proven. See README § Optional LiveKit + OpenAI Realtime and `npm run voice:realtime`.
 
 ## 4. Connect the generic event webhook (optional)
 

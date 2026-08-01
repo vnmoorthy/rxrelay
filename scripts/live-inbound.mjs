@@ -241,7 +241,7 @@ function startServeo() {
         "-o", "ExitOnForwardFailure=yes",
         "-o", "ServerAliveInterval=15",
         "-o", "ServerAliveCountMax=6",
-        "-R", `80:127.0.0.1:${voicePort}`,
+        "-R", `80:localhost:${voicePort}`,
         "serveo.net",
       ],
       {
@@ -385,7 +385,7 @@ async function openTunnel() {
   console.error("Start a tunnel yourself, verify POST /voice returns <Gather>, then:");
   console.error(`  npm run point -- https://YOUR-PUBLIC-HTTPS-BASE`);
   console.error("Options:");
-  console.error(`  ssh -N -R 80:127.0.0.1:${voicePort} serveo.net`);
+  console.error(`  ssh -R 80:localhost:${voicePort} serveo.net`);
   console.error(`  ngrok http ${voicePort}`);
   console.error(`  npx --yes localtunnel --port ${voicePort}`);
 }
