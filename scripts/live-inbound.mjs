@@ -5,9 +5,9 @@
  *
  * Tunnel order when VOICE_TUNNEL=auto (first that yields a public HTTPS URL wins):
  *   1. Cloudflare quick tunnel (CLOUDFLARED_BIN) — may 429 under load
- *   2. ngrok http (if `ngrok` on PATH)
- *   3. localtunnel via `npx localtunnel --port …`
- *   4. Serveo SSH reverse tunnel (ssh → serveo.net) — no account
+ *   2. Serveo SSH reverse tunnel (ssh → serveo.net) — no account; works for carrier webhooks
+ *   3. ngrok http (if `ngrok` on PATH + authtoken)
+ *   4. localtunnel via `npx localtunnel --port …` (browser interstitial often blocks TeXML)
  *   5. Optional: TUNNEL_PUBLIC_URL already set → skip tunnel, just point
  *
  * Voice stays up across tunnel retries. Only exits voice when the supervisor
@@ -261,8 +261,9 @@ async function openTunnel() {
     return;
   }
 
-  // auto: CF → ngrok → localtunnel → Serveo; voice stays up the whole time
-  for (const name of ["cloudflare", "ngrok", "localtunnel", "serveo"]) {
+  // auto: CF → Serveo → ngrok → localtunnel; voice stays up the whole time
+  // Serveo before localtunnel: loca.lt interstitial often breaks carrier TeXML POSTs.
+  for (const name of ["cloudflare", "serveo", "ngrok", "localtunnel"]) {
     if (await providers[name]()) return;
   }
 
