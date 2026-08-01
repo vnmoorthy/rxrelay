@@ -72,18 +72,37 @@ test("PAVO stops unsafe medical advice instead of automating it", () => {
 });
 
 test("configured verified turns use the strong OpenAI-compatible model", async () => {
-  const previous = { PAVO_OPENAI_BASE_URL: process.env.PAVO_OPENAI_BASE_URL, PAVO_OPENAI_API_KEY: process.env.PAVO_OPENAI_API_KEY, PAVO_FAST_MODEL: process.env.PAVO_FAST_MODEL, PAVO_STRONG_MODEL: process.env.PAVO_STRONG_MODEL };
-  Object.assign(process.env, { PAVO_OPENAI_BASE_URL: "https://gateway.example/v1", PAVO_OPENAI_API_KEY: "test-key", PAVO_FAST_MODEL: "fast", PAVO_STRONG_MODEL: "strong" });
+  const previous = {
+    PAVO_OPENAI_BASE_URL: process.env.PAVO_OPENAI_BASE_URL,
+    PAVO_OPENAI_API_KEY: process.env.PAVO_OPENAI_API_KEY,
+    PAVO_FAST_MODEL: process.env.PAVO_FAST_MODEL,
+    PAVO_STRONG_MODEL: process.env.PAVO_STRONG_MODEL,
+    PAVO_CHAT_MODEL: process.env.PAVO_CHAT_MODEL,
+  };
+  Object.assign(process.env, {
+    PAVO_OPENAI_BASE_URL: "https://hack.a1mobile.com/gw/v1",
+    PAVO_OPENAI_API_KEY: "test-key",
+    PAVO_FAST_MODEL: "fast",
+    PAVO_STRONG_MODEL: "strong",
+  });
+  delete process.env.PAVO_CHAT_MODEL;
   try {
     let request;
     const engine = new PavoInferenceEngine({ fetchImpl: async (url, options) => {
       request = { url, body: JSON.parse(options.body) };
-      return { ok: true, json: async () => ({ output_text: "I will confirm the pharmacy status." }) };
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { role: "assistant", content: "I will confirm the pharmacy status." } }],
+        }),
+      };
     } });
     const route = routeTurn({ transcript: "I could not hear the prior authorization number", asrConfidence: .61, noiseLevel: .55 });
     const reply = await engine.respond({ transcript: "test", route, caseBrief: "case" });
-    assert.equal(request.url, "https://gateway.example/v1/responses");
+    assert.equal(request.url, "https://hack.a1mobile.com/gw/v1/chat/completions");
     assert.equal(request.body.model, "strong");
+    assert.ok(request.body.max_tokens >= 180);
+    assert.equal(request.body.messages[0].role, "system");
     assert.equal(reply.source, "openai-compatible");
   } finally {
     for (const [key, value] of Object.entries(previous)) {
@@ -314,11 +333,12 @@ test("ASR repairs and avoid-repeat keep phone turns clean", async () => {
     [{ role: "assistant", text: "I'm listening. Learn what they need." }],
   );
   assert.notEqual(repeated, "I'm listening. Learn what they need.");
+  // Near-paraphrases from a strong LLM must be kept (anti-repeat is identical lines only).
   const nearDup = avoidRepeat(
     "Got it — prior authorization is on the record. Tell me when your doctor files it.",
     [{ role: "assistant", text: "Got it — prior authorization is on the record. Tell me when your doctor or clinic files it." }],
   );
-  assert.doesNotMatch(nearDup, /prior authorization is on the record/i);
+  assert.match(nearDup, /prior authorization is on the record/i);
 });
 
 test("voice lexicon expands paraphrases for intent and consent", async () => {

@@ -17,11 +17,13 @@ A1MOBILE_WEBHOOK_SECRET=long-random-secret
 VOICE_WEBHOOK_TOKEN=long-random-unpredictable-token
 A1MOBILE_COORDINATION_RECIPIENT=+1... # OTP-verified test number only
 LIVE_ALLOWED_RECIPIENTS=+1...
-PAVO_OPENAI_BASE_URL=https://gateway.example/openai/v1
+PAVO_OPENAI_BASE_URL=https://hack.a1mobile.com/gw/v1
 PAVO_OPENAI_API_KEY=a1hk_...
-PAVO_FAST_MODEL=openai.gpt-5.6-terra
-PAVO_STRONG_MODEL=openai.gpt-5.6-terra
+PAVO_FAST_MODEL=openai.gpt-5.6-sol
+PAVO_STRONG_MODEL=openai.gpt-5.6-sol
+# Optional: PAVO_CHAT_MODEL=openai.gpt-5.6-luna for open-chat fast turns
 ```
+
 
 ## 2. OTP-verify every outbound recipient
 
@@ -53,7 +55,7 @@ npm run voice
 
 `live:inbound` binds the TeXML service on `VOICE_PORT` (default 3001), opens a Cloudflare quick tunnel to that process only, and points the claimed number with `POST /api/numbers/point` `{ "webhook_url": "https://…/voice?token=…" }`.
 
-The a1mobile number calls this endpoint as TeXML. RxRelay returns a `<Gather input="speech">` response and receives form-encoded `SpeechResult` callbacks at `/voice/turn`. The endpoint records explicit, scoped consent only when the caller says an unambiguous permission phrase such as “I consent to a pharmacy status follow-up and text updates.”
+The a1mobile number calls this endpoint as TeXML. RxRelay returns a `<Gather input="speech">` response and receives form-encoded `SpeechResult` callbacks at `/voice/turn`. Consent is soft for demo UX: an unambiguous “I consent…” phrase still works, and asking for help with prescription/pharmacy status also counts as scoped yes.
 
 ## 4. Connect the generic event webhook (optional)
 

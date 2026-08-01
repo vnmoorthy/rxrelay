@@ -50,27 +50,27 @@ export function normalizeTranscript(transcript = "") {
 /** Soft next-step nudge for the model — not spoken verbatim every turn. */
 export function goalForStatus(statusKey, { consented = false } = {}) {
   if (!consented || statusKey === "intake") {
-    return "Confirm they want status help (that counts as consent), then learn the pharmacy situation. Do NOT re-ask if consent is already recorded.";
+    return "If they want help with pharmacy/prescription status, treat that as consent, acknowledge, and move on. Ask at most one clarifying fact. Do NOT re-ask consent once recorded.";
   }
   if (statusKey === "ready") {
-    return "Start a pharmacy status check when they want progress — or when they clearly describe being stuck. Do not re-ask the same start question.";
+    return "Acknowledge their situation and start a pharmacy status check when they want progress or clearly describe being stuck. Ask only what the pharmacy said next — one question max.";
   }
   if (statusKey === "coordinating") {
-    return "Capture what the pharmacy said — PA hold, insurance, or ready — without inventing outcomes.";
+    return "Acknowledge, then capture what the pharmacy said (PA hold, insurance, or ready) — one question only if needed. Do not invent outcomes.";
   }
   if (statusKey === "waiting_clinic") {
-    return "Learn whether the clinic/doctor submitted the prior authorization. Do not re-ask if they already answered.";
+    return "Acknowledge the PA hold. Ask once whether the clinic/doctor filed it — skip if they already answered.";
   }
   if (statusKey === "waiting_pharmacy") {
-    return "Learn whether the pharmacy confirmed ready for pickup. Do not re-ask if they already answered.";
+    return "Acknowledge clinic filing. Ask once whether the pharmacy confirmed ready for pickup — skip if they already answered.";
   }
   if (statusKey === "awaiting_update" || statusKey === "resolved") {
-    return "Confirm completion briefly and close warmly. Do not restart the status trail.";
+    return "Confirm completion warmly (pickup ready + update sent). Do not restart the status trail.";
   }
   if (statusKey === "human_review") {
     return "Reassure them a human owns the case; do not automate further.";
   }
-  return "Listen, clarify, and advance evidence only when facts arrive.";
+  return "Acknowledge, act on facts, ask one next fact only when needed.";
 }
 
 export function optionsForStatus(statusKey, { consented = false } = {}) {
@@ -205,33 +205,14 @@ function normSpeech(s = "") {
   return String(s).toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** Avoid repeating the same spoken line(s) when intent/status didn't move. */
+/** Avoid repeating an *identical* spoken line only — keep good LLM paraphrases. */
 export function avoidRepeat(reply, conversationTurns = []) {
   const recent = lastAssistantLines(conversationTurns, 2).map(normSpeech).filter(Boolean);
-  let next = String(reply || "").trim();
+  const next = String(reply || "").trim();
   if (!recent.length || !next) return next;
-
   const b = normSpeech(next);
-  const bTokens = b.split(/\s+/).filter(Boolean);
-  for (const a of recent) {
-    if (a === b) {
-      return "Got it — I'm still with you. What else should I know?";
-    }
-    if (a.length > 40 && b.includes(a.slice(0, Math.min(80, a.length)))) {
-      return "Okay. What's the latest on your end?";
-    }
-    // Near-duplicate paraphrase (high token overlap)
-    if (a.length > 30 && bTokens.length >= 6) {
-      const aSet = new Set(a.split(/\s+/).filter(Boolean));
-      const overlap = bTokens.filter((tok) => aSet.has(tok)).length / bTokens.length;
-      if (overlap >= 0.72) return "Okay. What's the latest on your end?";
-    }
-    const aOpen = a.split(/\s+/).slice(0, 8).join(" ");
-    const bOpen = b.split(/\s+/).slice(0, 8).join(" ");
-    if (aOpen && aOpen === bOpen && a !== b) {
-      next = next.replace(/^[^.]+\.\s*/, "").trim() || "Okay — go ahead.";
-      break;
-    }
+  if (recent.includes(b)) {
+    return "Got it — I'm still with you. What else should I know?";
   }
   return next;
 }

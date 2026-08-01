@@ -101,6 +101,14 @@ function config() {
     },
     safety: "No clinical advice, prescribing, controlled-medication inventory, or unconsented outreach.",
     permittedActions: PERMITTED_ACTIONS,
+    inference: {
+      model: process.env.PAVO_STRONG_MODEL || process.env.PAVO_FAST_MODEL || null,
+      strongModel: process.env.PAVO_STRONG_MODEL || null,
+      fastModel: process.env.PAVO_FAST_MODEL || null,
+      chatModel: process.env.PAVO_CHAT_MODEL || null,
+      baseUrl: process.env.PAVO_OPENAI_BASE_URL ? String(process.env.PAVO_OPENAI_BASE_URL).replace(/\/$/, "") : null,
+      configured: Boolean(process.env.PAVO_OPENAI_BASE_URL && process.env.PAVO_OPENAI_API_KEY && (process.env.PAVO_STRONG_MODEL || process.env.PAVO_FAST_MODEL)),
+    },
   };
 }
 

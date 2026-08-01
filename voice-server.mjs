@@ -86,7 +86,11 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, {
         ok: true,
         service: "rxrelay-voice",
-        model: process.env.PAVO_FAST_MODEL || null,
+        model: process.env.PAVO_STRONG_MODEL || process.env.PAVO_FAST_MODEL || null,
+        chatModel: process.env.PAVO_CHAT_MODEL || null,
+        fastModel: process.env.PAVO_FAST_MODEL || null,
+        strongModel: process.env.PAVO_STRONG_MODEL || null,
+        inferenceBase: process.env.PAVO_OPENAI_BASE_URL ? String(process.env.PAVO_OPENAI_BASE_URL).replace(/\/$/, "") : null,
         captureUpgrade: TIER_LABELS.verified.captureMode,
         voice: process.env.TEXML_VOICE || "Polly.Joanna-Neural",
       });
