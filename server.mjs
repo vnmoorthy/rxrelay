@@ -79,7 +79,7 @@ function say(text) {
 
 function gather(prompt, actionUrl, verified = false) {
   const input = verified ? "speech dtmf" : "speech";
-  return `<Gather input="${input}" action="${xmlEscape(actionUrl)}" method="POST" timeout="9" speechTimeout="auto" language="en-US"${verified ? ' numDigits="8"' : ""}>${say(prompt)}</Gather>${say(noInputPrompt())}`;
+  return `<Gather input="${input}" action="${xmlEscape(actionUrl)}" method="POST" timeout="12" speechTimeout="auto" language="en-US"${verified ? ' numDigits="8"' : ""}>${say(prompt)}</Gather><Redirect method="POST">${xmlEscape(actionUrl)}</Redirect>`;
 }
 
 function config() {
